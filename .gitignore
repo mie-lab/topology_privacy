@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# sensitive data
+dblogin.json
+
+# vscode
+*code-workspace
+
 # C extensions
 *.so
 
