@@ -15,6 +15,26 @@ import matplotlib
 from sklearn.metrics import mean_squared_error
 
 
+def calculate_reciprocal_rank(df, k=10, distance_column="distance"):
+    # TODO: computing top-k-accuracy with this function vs the other function - results don't match
+
+    df["rank"] = df.groupby(by=["p_duration", "p_user_id", "u_duration", "p_filename", "u_filename"])[
+        distance_column
+    ].rank()
+    df["reciprocal_rank"] = 1 / df["rank"]
+    df_rank_filtered = df[df["same_user"]]
+
+    # for top 10
+    # df_rank_filtered["topk"] = (df_rank_filtered["rank"] <= k).astype(int)
+    # matrix_elements = df_rank_filtered.groupby(by=["p_duration", "u_duration"])["topk"].agg(["mean", "std"])
+
+    matrix_elements = df_rank_filtered.groupby(by=["p_duration", "u_duration"])["reciprocal_rank"].agg(["mean", "std"])
+
+    mean_matrix = matrix_elements["mean"].unstack(level=-1, fill_value=None) * 100
+    std_matrix = matrix_elements["std"].unstack(level=-1, fill_value=None) * 100
+    return mean_matrix, std_matrix
+
+
 def calculate_topk_accuracy(df, k, distance_column="distance"):
     # get best guesses per group ranks
     # get minimum row index per group for each block of [p_duration, p_user, p_start_date(=p_filename) u_duration]
@@ -69,6 +89,15 @@ if __name__ == "__main__":
 
     print("\nMEAN")
     print(mean_matrix)
-    print("\nSTD")
-    print(std_matrix)
+    # print("\nSTD")
+    # print(std_matrix)
 
+    print("RECIPROCAL")
+    mean_matrix, std_matrix = calculate_reciprocal_rank(
+        feature_cross_product_df, k=10, distance_column=DIST_COL
+    )  # uses the column distance
+
+    print("\nMEAN")
+    print(mean_matrix)
+    # print("\nSTD")
+    # print(std_matrix)
