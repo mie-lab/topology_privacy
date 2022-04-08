@@ -13,21 +13,7 @@ from graph_trackintel.analysis.graph_features import (
     betweenness_centrality,
     get_degrees,
 )
-
-
-def get_con():
-    DBLOGIN_FILE = os.path.join("dblogin.json")
-    with open(DBLOGIN_FILE) as json_file:
-        LOGIN_DATA = json.load(json_file)
-
-    con = psycopg2.connect(
-        dbname=LOGIN_DATA["database"],
-        user=LOGIN_DATA["user"],
-        password=LOGIN_DATA["password"],
-        host=LOGIN_DATA["host"],
-        port=LOGIN_DATA["port"],
-    )
-    return con
+from utils import get_engine
 
 
 def normed_list(vals):
@@ -67,8 +53,8 @@ def shortest_path_distribution(graph, max_len=10):
 
 def precompute_features():
     print("----------------- GET TIME BINS FOR GC 1 and 2 --------------------")
-    con = get_con()
-    engine = create_engine("postgresql+psycopg2://", creator=get_con)
+    con = get_engine(return_con=True)
+    engine = get_engine()
 
     dtype_dict = {
         "centrality_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),

@@ -16,9 +16,7 @@ def get_engine(return_con=False, DBLOGIN_FILE=os.path.join("..", "dblogin.json")
     with open(DBLOGIN_FILE) as json_file:
         LOGIN_DATA = json.load(json_file)
 
-    conn_string = "postgresql://{user}:{password}@{host}:{port}/{database}".format(**LOGIN_DATA)
-    engine = create_engine(conn_string)
-    if return_con:
+    def get_con():
         con = psycopg2.connect(
             dbname=LOGIN_DATA["database"],
             user=LOGIN_DATA["user"],
@@ -26,8 +24,10 @@ def get_engine(return_con=False, DBLOGIN_FILE=os.path.join("..", "dblogin.json")
             host=LOGIN_DATA["host"],
             port=LOGIN_DATA["port"],
         )
+        return con
 
     if return_con:
-        return con
+        return get_con()
     else:
+        engine = create_engine("postgresql+psycopg2://", creator=get_con)
         return engine
