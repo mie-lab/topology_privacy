@@ -4,6 +4,7 @@ import pandas as pd
 import psycopg2
 import numpy as np
 from sqlalchemy import create_engine
+import sqlalchemy
 
 from graph_trackintel.graph_utils import get_largest_component
 from graph_trackintel.io import read_graphs_from_postgresql
@@ -39,7 +40,8 @@ def degree_dist(graph, mode="in", cutoff=10):
     """
     degree_vals = get_degrees(graph, mode=mode)
     all_vals = sorted(degree_vals)
-    topk_vals = np.array(all_vals[-cutoff:])
+    topk_vals = np.zeros(cutoff)  # for padding
+    topk_vals[-len(all_vals) :] = all_vals[-cutoff:]
     return normed_list(topk_vals)
 
 
@@ -68,7 +70,14 @@ def precompute_features():
     con = get_con()
     engine = create_engine("postgresql+psycopg2://", creator=get_con)
 
-    for study in ["gc2"]:
+    dtype_dict = {
+        "centrality_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
+        "in_degree_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
+        "out_degree_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
+        "shortest_path_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
+    }
+
+    for study in ["gc1", "gc2"]:
         # initialize output table
         table_precomputed_feats = []
         # Make new directory for this duration data
@@ -97,9 +106,7 @@ def precompute_features():
                         "user_id": str(user_id),
                         "duration": int(weeks),
                         "file_name": str(file_name),
-                        "shortest_path_feats": shortest_path_distribution(
-                            graph
-                        ),
+                        "shortest_path_feats": shortest_path_distribution(graph),
                         "centrality_feats": centrality_dist(graph),
                         "in_degree_feats": degree_dist(graph),
                         "out_degree_feats": degree_dist(graph, mode="out"),
@@ -108,16 +115,9 @@ def precompute_features():
 
             # write to db
             df_feats = pd.DataFrame(table_precomputed_feats)
-            df_feats.to_sql("dur_features", engine, study, if_exists="replace")
+            df_feats.to_sql("dur_features", engine, study, if_exists="replace", dtype=dtype_dict)
             print("written to db")
 
 
 if __name__ == "__main__":
     precompute_features()
-
-    # # retrieve data
-    # con = get_con()
-    # engine = create_engine("postgresql+psycopg2://", creator=get_con)
-    # table_orig = pd.read_sql("SELECT * FROM gc2.dur_features", engine)
-    # dict_val = list(eval(table_orig["in_degree_feats"].values[0]))
-    # print(dict_val)
