@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import sqlalchemy
+from torch import reciprocal
 from graph_trackintel.io import read_graphs_from_postgresql
 from utils import get_engine
 from pandas import DataFrame
@@ -18,7 +19,7 @@ from sklearn.metrics import mean_squared_error
 def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance"):
     # TODO: computing top-k-accuracy with this function vs the other function - results don't match
 
-    df["rank"] = df.groupby(by=["p_duration", "u_user_id", "u_duration", "p_filename", "u_filename"])[
+    df["rank"] = df.groupby(by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"])[
         distance_column
     ].rank()
     df_rank_filtered = df[df["same_user"]]
@@ -89,7 +90,21 @@ if __name__ == "__main__":
         feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
     )
 
-    DIST_COL = "kldiv_in_degree"
+    # Compute combined distances
+    for metric in ["kldiv", "mse", "wasserstein"]:
+        feature_cross_product_df[f"{metric}_combined"] = (
+            feature_cross_product_df[f"{metric}_in_degree"]
+            + feature_cross_product_df[f"{metric}_out_degree"]
+            + feature_cross_product_df[f"{metric}_shortest_path"]
+        )
+    feature_cross_product_df["all_combined"] = (
+        feature_cross_product_df["kldiv_combined"]
+        + feature_cross_product_df["mse_combined"]
+        + feature_cross_product_df["wasserstein_combined"]
+    )
+
+    # Print out results for one case
+    DIST_COL = "all_combined"
     mean_matrix, std_matrix = calculate_topk_accuracy(
         feature_cross_product_df, k=10, distance_column=DIST_COL
     )  # uses the column distance
@@ -102,22 +117,26 @@ if __name__ == "__main__":
     print("Output new function(based on rank):")
     print(mean_matrix)
 
-    # Run on all dist types
-    for dist_col in [
-        "kldiv_in_degree",
-        "mse_in_degree",
-        "wasserstein_in_degree",
-        "kldiv_shortest_path",
-        "mse_shortest_path",
-        "wasserstein_shortest_path",
-        "kldiv_out_degree",
-        "mse_out_degree",
-        "wasserstein_out_degree",
-        "kldiv_centrality",
-        "mse_centrality",
-        "wasserstein_centrality",
-    ]:
-        mean_matrix, std_matrix = calculate_reciprocal_rank(feature_cross_product_df, k=10, distance_column=dist_col)
-        mean_matrix.to_csv(os.path.join("outputs", "mean_" + dist_col + ".csv"))
-        std_matrix.to_csv(os.path.join("outputs", "std_" + dist_col + ".csv"))
+    # collect all possibilities and save as csvs
+    possible_cols = []
+    for metric in ["kldiv", "mse", "wasserstein"]:
+        for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "combined"]:
+            possible_cols.append(metric + "_" + feats)
+    possible_cols.append("all_combined")
+
+    for k in [0, 5, 10]:
+        out_path = os.path.join("outputs", "acc_k" + str(k))
+        os.makedirs(out_path, exist_ok=True)
+        # Run on all dist types
+        for dist_col in possible_cols:
+            if k == 0:  # encoding for reciprocal rank:
+                mean_matrix, std_matrix = calculate_reciprocal_rank(
+                    feature_cross_product_df, return_reciprocal=True, distance_column=dist_col
+                )
+            else:
+                mean_matrix, std_matrix = calculate_reciprocal_rank(
+                    feature_cross_product_df, k=k, distance_column=dist_col
+                )
+            mean_matrix.to_csv(os.path.join(out_path, "mean_" + dist_col + ".csv"))
+            std_matrix.to_csv(os.path.join(out_path, "std_" + dist_col + ".csv"))
 
