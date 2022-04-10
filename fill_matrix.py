@@ -35,7 +35,10 @@ def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column
 
     # for top k
     df_rank_filtered["topk"] = (df_rank_filtered["rank"] <= k).astype(int)
-    matrix_elements = df_rank_filtered.groupby(by=["p_duration", "u_duration"])["topk"].agg(["mean", "std"])
+    df_rank_top_acc = df_rank_filtered.groupby(by=["u_duration", "p_duration", "u_filename", "p_filename"]).agg(
+        {"topk": "mean"}
+    )
+    matrix_elements = df_rank_top_acc.groupby(by=["p_duration", "u_duration"])["topk"].agg(["mean", "std"])
 
     mean_matrix = matrix_elements["mean"].unstack(level=-1, fill_value=None) * 100
     std_matrix = matrix_elements["std"].unstack(level=-1, fill_value=None) * 100
@@ -66,8 +69,13 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
     # Groups for matrix are: ['p_duration', 'u_duration']
     # we now aggregate to the final matrix and calculate mean + standard deviation
 
+    # aggregate users for accuracy
+    acc_by_group = correct_guess_by_group.groupby(by=["u_duration", "p_duration", "u_filename", "p_filename"]).agg(
+        {"same_user": "mean"}
+    )
+
     # aggregate to matrix elements
-    matrix_elements = correct_guess_by_group.groupby(by=["p_duration", "u_duration"])["same_user"].agg(["mean", "std"])
+    matrix_elements = acc_by_group.groupby(by=["p_duration", "u_duration"])["same_user"].agg(["mean", "std"])
 
     mean_matrix = matrix_elements["mean"].unstack(level=-1, fill_value=None) * 100
     std_matrix = matrix_elements["std"].unstack(level=-1, fill_value=None) * 100
@@ -111,11 +119,13 @@ if __name__ == "__main__":
 
     print("Output original k accuracy function:")
     print(mean_matrix)
+    print(std_matrix)
 
     mean_matrix, std_matrix = calculate_reciprocal_rank(feature_cross_product_df, k=10, distance_column=DIST_COL)
 
     print("Output new function(based on rank):")
     print(mean_matrix)
+    print(std_matrix)
 
     # collect all possibilities and save as csvs
     possible_cols = []
