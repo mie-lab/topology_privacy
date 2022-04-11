@@ -24,7 +24,14 @@ import os
 
 if __name__ == '__main__':
 
-    datasets = ['gc1', 'gc2']
+    datasets = ['gc2', 'gc1']
+
+    # Threshold
+    # query to determine threshold:
+    # "select p_duration, p_filename, u_duration, u_filename, count(*) as count_el from gc2.dur_features_cross_join
+    # group by p_duration, p_filename, u_duration, u_filename order by p_duration, u_duration, p_filename;"
+
+    dset_thresholds = {'gc1': 5000, 'gc2': 1000}
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     con = engine.connect()
 
@@ -56,7 +63,46 @@ if __name__ == '__main__':
                 t1.enddate <= t2.file_name::timestamp
             ORDER
             BY t1.user_id, t1.duration, t1.file_name, t2.user_id, t2.duration, t2.file_name::timestamp;
+            
+            
         """
 
         con.execute(sql_query)
+        con.execute(f"ALTER TABLE {ds}.dur_features_cross_join ADD COLUMN postgres_id SERIAL PRIMARY KEY;")
+
+        # Delete (p_duration, p_filename, u_duration, u_filename) with very few observations.
+        # The SQL query always choses the next possible non-overlapping time bin (=u_filename) for a
+        # p_duration, p_filename, u_duration combination. Because of the way the graphs are created and filtered by
+        # trackign quality (min days tracked) some combinations of (u_filename, u_duration) are missing for some users.
+        # In such a case
+        # There are p_duration, p_filename, u_duration, u_filename combinations with very few elements.
+
+        sql_query_postprocessing = f"""
+        WITH 
+            ids_by_count as (
+                SELECT array_agg(postgres_id) AS postgres_ids, p_duration, p_filename, u_duration, u_filename, 
+                    count(*) AS count_el 
+                FROM {ds}.dur_features_cross_join 
+                GROUP BY p_duration, p_filename, u_duration, 
+                    u_filename HAVING count(*) < {dset_thresholds[ds]} 
+                ORDER BY p_duration, u_duration, p_filename),
+            invalid_id_list as (
+                SELECT array_agg(postgres_ids_unnest) AS id_array 
+                FROM ids_by_count, unnest(postgres_ids) AS postgres_ids_unnest)
+    
+        DELETE FROM {ds}.dur_features_cross_join 
+        WHERE postgres_id = ANY(
+            SELECT unnest(id_array) FROM invalid_id_list);
+        """
+        con.execute(sql_query_postprocessing)
+
+        # ensure that nina has access to tables.
+        try:
+            sql_access = f"""GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {ds} TO wnina;"""
+            con.execute(sql_access)
+        except:
+            print("could not grant access to wnina")
+
+
+
 
