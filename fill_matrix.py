@@ -18,17 +18,16 @@ from sklearn.metrics import mean_squared_error
 from visualization import plot_intra_inter
 
 
-def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance"):
-    # TODO: computing top-k-accuracy with this function vs the other function - results don't match
+def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance", intra_inter_study=None):
 
     df["rank"] = df.groupby(by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"])[
         distance_column
     ].rank()
+    # for comparison to other paper:
+    # df[["p_user_id", "u_user_id", "rank"]].to_csv("test_data_privacy_loss_gc2.csv")
     df_rank_filtered = df[df["same_user"]]
-    # df_rank_filtered[["p_user_id", "u_user_id", "u_duration", "u_filename", "p_duration", "p_filename", "rank"]].to_csv(
-    #     "test_data_inter_intra.csv"
-    # )
-    plot_intra_inter(df_rank_filtered, os.path.join("1paper", "figures", "inter_intra.pdf"))
+    if intra_inter_study is not None:
+        plot_intra_inter(df_rank_filtered, os.path.join("1paper", "figures", f"inter_intra_{intra_inter_study}.pdf"))
 
     if return_reciprocal:
         df_rank_filtered["reciprocal_rank"] = 1 / df_rank_filtered["rank"]
@@ -58,7 +57,7 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
 
     min_row_ix_by_group = (
         df.groupby(by=["p_duration", "u_user_id", "u_duration", "p_filename", "u_filename"])[distance_column]
-        .nsmallest(k, keep='all')
+        .nsmallest(k, keep="all")
         .index.get_level_values(-1)
     )
     # top k guesses
@@ -88,19 +87,20 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
 
     return mean_matrix, std_matrix
 
+
 def clean_impossible_matches(df):
     """Delete impossible tasks from data (user not in pool)."""
     df_ix = df.index
-    df_ = df.set_index(['p_duration', 'u_duration', 'p_filename', 'u_filename', 'u_user_id'])
-    df_['df_ix'] = df_ix
+    df_ = df.set_index(["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])
+    df_["df_ix"] = df_ix
 
-    sum_same_user_by_task = df.groupby(by=['p_duration', 'u_duration', 'p_filename', 'u_filename', 'u_user_id'])['same_user'].sum()
+    sum_same_user_by_task = df.groupby(by=["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])[
+        "same_user"
+    ].sum()
     impossible_task_ix = sum_same_user_by_task[sum_same_user_by_task < 1].index
 
-    df_ix_to_delete = df_.loc[impossible_task_ix, 'df_ix']
+    df_ix_to_delete = df_.loc[impossible_task_ix, "df_ix"]
     return df.drop(df_ix_to_delete)
-
-
 
 
 if __name__ == "__main__":
@@ -143,7 +143,9 @@ if __name__ == "__main__":
     print(mean_matrix)
     print(std_matrix)
 
-    mean_matrix, std_matrix = calculate_reciprocal_rank(feature_cross_product_df, k=10, distance_column=DIST_COL)
+    mean_matrix, std_matrix = calculate_reciprocal_rank(
+        feature_cross_product_df, k=10, distance_column=DIST_COL, intra_inter_study=STUDY
+    )
 
     print("Output new function(based on rank):")
     print(mean_matrix)

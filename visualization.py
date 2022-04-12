@@ -35,18 +35,33 @@ def plot_matrix(mean, std=None, save_path=None):
         plt.show()
 
 
-def feature_comparison_table(path_to_acc):
+def feature_comparison_table(in_path, use_acc=10):
     feature_comp_dict = {}
-    for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "combined"]:
-        mean = pd.read_csv(os.path.join(path_to_acc, f"mean_kldiv_{feats}.csv"), index_col="p_duration")
-        mean_28 = np.mean(mean["28"].values)
-        mean_all = np.nanmean(mean.values)
-        feature_comp_dict[feats] = {
-            "Mean reciprocal rank (p_duration=28)": mean_28,
-            "Mean reciprocal rank (overall)": mean_all,
-            "Max. reciprocal rank": np.nanmax(mean.values),
-        }
-    print(pd.DataFrame(feature_comp_dict).to_latex(float_format="%.2f"))
+    for metric in ["kldiv", "mse", "wasserstein", "all"]:
+        for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "combined"]:
+            if metric == "all" and feats != "combined":
+                continue
+            feature_comp_dict[(metric, feats)] = {}
+            for study in ["gc1", "gc2"]:
+                mean = pd.read_csv(
+                    os.path.join(in_path, study, "acc_k0", f"mean_{metric}_{feats}.csv"), index_col="p_duration"
+                )
+                mean_acc = pd.read_csv(
+                    os.path.join(in_path, study, "acc_k" + str(use_acc), f"mean_{metric}_{feats}.csv"),
+                    index_col="p_duration",
+                )
+                feature_comp_dict[(metric, feats)].update(
+                    {
+                        (study, "Mean RR"): np.nanmean(mean.values),
+                        (study, "Max RR"): np.nanmax(mean.values),
+                        (study, f"Mean {use_acc}-Acc"): np.nanmean(mean_acc.values),
+                        (study, f"Max {use_acc}-Acc"): np.nanmax(mean_acc.values),
+                    }
+                )
+    df_raw = pd.DataFrame(feature_comp_dict)
+    df = df_raw.swapaxes(1, 0)
+    print(df)
+    print(df.to_latex(float_format="%.2f"))
 
 
 def plot_intra_inter(rank_df, save_path=None):
@@ -99,6 +114,7 @@ def plot_intra_inter(rank_df, save_path=None):
         Line2D([0], [0], marker="o", color="r", lw=2, label="Inter-user std", markerfacecolor="r", markersize=10),
     ]
     plt.legend(handles=legend_elements, loc="upper right")
+    plt.tight_layout()
     if save_path is not None:
         plt.savefig(save_path)
     else:
@@ -106,15 +122,18 @@ def plot_intra_inter(rank_df, save_path=None):
 
 
 if __name__ == "__main__":
-    # matrix
-    save_path = "../topology_privacy/1paper/figures"
-    mean = pd.read_csv(
-        "../topology_privacy/outputs/v1_wrong_std/acc_k10/mean_kldiv_combined.csv", index_col="p_duration"
-    )
-    std = pd.read_csv("../topology_privacy/outputs/v1_wrong_std/acc_k10/std_kldiv_combined.csv", index_col="p_duration")
-    out_name = "acc_kldiv.pdf"
-    plot_matrix(mean, std, os.path.join(save_path, out_name))
+    study = "gc2"
+
+    in_path = os.path.join("outputs", study)
+    save_path = os.path.join("1paper", "figures", "results")
+    use_metric = "mse_combined"
+
+    # plot matrix
+    for acc in ["acc_k0", "acc_k5", "acc_k10"]:
+        mean = pd.read_csv(os.path.join(in_path, acc, f"mean_{use_metric}.csv"), index_col="p_duration")
+        std = pd.read_csv(os.path.join(in_path, acc, f"std_{use_metric}.csv"), index_col="p_duration")
+        out_name = f"{study}_{acc}_{use_metric}.pdf"
+        plot_matrix(mean, std, os.path.join(save_path, out_name))
 
     # Table for feature comparison
-    path_to_acc = "../topology_privacy/outputs/acc_k0/"
-    feature_comparison_table(path_to_acc)
+    feature_comparison_table("outputs")
