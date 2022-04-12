@@ -58,7 +58,7 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
 
     min_row_ix_by_group = (
         df.groupby(by=["p_duration", "u_user_id", "u_duration", "p_filename", "u_filename"])[distance_column]
-        .nsmallest(k)
+        .nsmallest(k, keep='all')
         .index.get_level_values(-1)
     )
     # top k guesses
@@ -88,6 +88,20 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
 
     return mean_matrix, std_matrix
 
+def clean_impossible_matches(df):
+    """Delete impossible tasks from data (user not in pool)."""
+    df_ix = df.index
+    df_ = df.set_index(['p_duration', 'u_duration', 'p_filename', 'u_filename', 'u_user_id'])
+    df_['df_ix'] = df_ix
+
+    sum_same_user_by_task = df.groupby(by=['p_duration', 'u_duration', 'p_filename', 'u_filename', 'u_user_id'])['same_user'].sum()
+    impossible_task_ix = sum_same_user_by_task[sum_same_user_by_task < 1].index
+
+    df_ix_to_delete = df_.loc[impossible_task_ix, 'df_ix']
+    return df.drop(df_ix_to_delete)
+
+
+
 
 if __name__ == "__main__":
 
@@ -97,13 +111,14 @@ if __name__ == "__main__":
     os.makedirs(output_base_path, exist_ok=True)
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     print("download distances")
-    distances_query = f"SELECT * FROM {STUDY}.distance"  #  WHERE p_duration>16 and u_duration<16"  # for testing:
+    distances_query = f"SELECT * FROM {STUDY}.distance" # WHERE p_duration>16 and u_duration<16"  # for testing:
     feature_cross_product_df = pd.read_sql(distances_query, con=engine)
 
     # calculate same_user_flag (important for topk acc)
     feature_cross_product_df["same_user"] = (
         feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
     )
+    feature_cross_product_df = clean_impossible_matches(feature_cross_product_df)
 
     # Compute combined distances
     for metric in ["kldiv", "mse", "wasserstein"]:
