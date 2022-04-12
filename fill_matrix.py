@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 from sklearn.metrics import mean_squared_error
 
+from visualization import plot_intra_inter
+
 
 def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance"):
     # TODO: computing top-k-accuracy with this function vs the other function - results don't match
@@ -23,6 +25,10 @@ def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column
         distance_column
     ].rank()
     df_rank_filtered = df[df["same_user"]]
+    # df_rank_filtered[["p_user_id", "u_user_id", "u_duration", "u_filename", "p_duration", "p_filename", "rank"]].to_csv(
+    #     "test_data_inter_intra.csv"
+    # )
+    plot_intra_inter(df_rank_filtered, os.path.join("1paper", "figures", "inter_intra.pdf"))
 
     if return_reciprocal:
         df_rank_filtered["reciprocal_rank"] = 1 / df_rank_filtered["rank"]
@@ -85,9 +91,10 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
 
 if __name__ == "__main__":
 
-    STUDY = "gc1"
+    STUDY = "gc2"
 
-    os.makedirs("outputs", exist_ok=True)
+    output_base_path = os.path.join("outputs", STUDY)
+    os.makedirs(output_base_path, exist_ok=True)
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     print("download distances")
     distances_query = f"SELECT * FROM {STUDY}.distance"  #  WHERE p_duration>16 and u_duration<16"  # for testing:
@@ -135,7 +142,7 @@ if __name__ == "__main__":
     possible_cols.append("all_combined")
 
     for k in [0, 5, 10]:
-        out_path = os.path.join("outputs", "acc_k" + str(k))
+        out_path = os.path.join(output_base_path, "acc_k" + str(k))
         os.makedirs(out_path, exist_ok=True)
         # Run on all dist types
         for dist_col in possible_cols:

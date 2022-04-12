@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import seaborn as sns
 
 
@@ -46,6 +47,62 @@ def feature_comparison_table(path_to_acc):
             "Max. reciprocal rank": np.nanmax(mean.values),
         }
     print(pd.DataFrame(feature_comp_dict).to_latex(float_format="%.2f"))
+
+
+def plot_intra_inter(rank_df, save_path=None):
+    # intra user
+    std_rank_per_user = (
+        rank_df.groupby(["p_duration", "u_user_id"])
+        .agg({"rank": "std", "u_user_id": "count"})
+        .rename(columns={"rank": "rank_std", "u_user_id": "nr_samples"})
+    )
+    intra_user = std_rank_per_user.reset_index().groupby("p_duration").agg({"rank_std": ["mean", "std"]})
+
+    # inter user
+    # v1
+    # mean_rank_per_user = rank_df.groupby(["p_duration", "u_user_id"]).agg({"rank": "mean"})
+    # inter_user = (
+    #     mean_rank_per_user.reset_index().groupby("p_duration").agg({"rank": "std"}).rename(columns={"rank": "rank_std"})
+    # )
+    std_rank_per_bin = (
+        rank_df.groupby(["p_duration", "u_duration", "u_filename", "p_filename"])
+        .agg({"rank": "std"})
+        .rename(columns={"rank": "rank_std"})
+    )
+    inter_user = std_rank_per_bin.reset_index().groupby("p_duration").agg({"rank_std": ["mean", "std"]})
+
+    offset = 0.25
+    plt.errorbar(
+        inter_user.index - offset,
+        inter_user[("rank_std", "mean")],
+        yerr=inter_user[("rank_std", "std")],
+        fmt="o",
+        ecolor="r",
+        color="r",
+        markersize=10,
+    )
+    plt.errorbar(
+        intra_user.index + offset,
+        intra_user[("rank_std", "mean")],
+        yerr=intra_user[("rank_std", "std")],
+        fmt="o",
+        ecolor="b",
+        color="b",
+        markersize=10,
+    )
+    plt.xticks(inter_user.index, inter_user.index)
+    plt.xlabel("Tracking period of pool")
+    plt.ylabel("Standard deviation of rank")
+
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="b", lw=2, label="Intra-user std", markerfacecolor="b", markersize=10),
+        Line2D([0], [0], marker="o", color="r", lw=2, label="Inter-user std", markerfacecolor="r", markersize=10),
+    ]
+    plt.legend(handles=legend_elements, loc="upper right")
+    if save_path is not None:
+        plt.savefig(save_path)
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":
