@@ -121,6 +121,56 @@ def plot_intra_inter(rank_df, save_path=None):
         plt.show()
 
 
+def privacy_loss_plot(gc1_ranks, gc2_ranks):
+
+    # implementation of privacy loss according to paper
+    def prob_informed(rank_df):
+        rank_df["recip_rank"] = rank_df["rank"].apply(lambda x: 1 / x)
+        sum_recip_rank = rank_df.groupby("u_user_id").agg({"recip_rank": "sum"})
+        rank_df = rank_df.merge(sum_recip_rank, how="left", left_on="u_user_id", right_index=True)
+        rank_df["prob_informed"] = rank_df["recip_rank_x"] / rank_df["recip_rank_y"]
+        return rank_df
+
+    def privacy_loss(rank_df, nr_ranks):
+        rank_df_same_user = rank_df[rank_df["p_user_id"] == rank_df["u_user_id"]]
+        rank_df_same_user["privacy_loss"] = rank_df_same_user["prob_informed"] / (1 / nr_ranks) - 1
+        return rank_df_same_user
+
+    prob_informed_df = prob_informed(gc1_ranks.copy())
+    out_gc1 = privacy_loss(prob_informed_df, len(prob_informed_df["p_user_id"].unique()))
+
+    prob_informed_df = prob_informed(gc2_ranks.copy())
+    out_gc2 = privacy_loss(prob_informed_df, len(prob_informed_df["p_user_id"].unique()))
+    print("Median privacy loss")
+    print(
+        np.median(out_gc1["privacy_loss"]),
+        np.mean(out_gc1["privacy_loss"]),
+        "GC2:",
+        np.median(out_gc2["privacy_loss"]),
+        np.mean(out_gc2["privacy_loss"]),
+    )
+    print("Decrease of rank")
+    print(np.mean(out_gc1["rank"]), "vs random strategy", len(gc1_ranks["p_user_id"].unique()) // 2)
+    print(np.mean(out_gc2["rank"]), "vs random strategy", len(gc2_ranks["p_user_id"].unique()) // 2)
+    plt.rcParams.update({"font.size": 15})
+
+    plt.figure(figsize=(5, 5))
+    plt.boxplot([out_gc1["rank"], out_gc2["rank"]])
+    plt.xticks([1, 2], ["Green Class 1", "Green Class 2"])
+    plt.ylabel("Rank")
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, "rank_dist.pdf"))
+    plt.show()
+
+    plt.figure(figsize=(5, 5))
+    plt.boxplot([out_gc1["privacy_loss"], out_gc2["privacy_loss"]])
+    plt.xticks([1, 2], ["Green Class 1", "Green Class 2"])
+    plt.ylabel("Privacy loss")
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, "privacy_loss.pdf"))
+    plt.show()
+
+
 if __name__ == "__main__":
     study = "gc2"
 
