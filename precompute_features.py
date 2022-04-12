@@ -20,7 +20,7 @@ def normed_list(vals):
     return (vals / np.sum(vals)).tolist()
 
 
-def degree_dist(graph, mode="in", cutoff=10):
+def degree_dist(graph, mode="in", cutoff=20):
     """
     mode: in (=indegree), out (outdegree) or all (both)
     """
@@ -51,12 +51,21 @@ def shortest_path_distribution(graph, max_len=10):
     return normed_list(sp_counts)
 
 
+def transition_distribution(graph, cutoff=20):
+    transitions = np.array([edge[2]["weight"] for edge in graph.edges(data=True)])
+    all_vals = sorted(transitions)
+    topk_vals = np.zeros(cutoff)  # for padding
+    topk_vals[-len(all_vals) :] = all_vals[-cutoff:]
+    return normed_list(topk_vals)
+
+
 def precompute_features():
     print("----------------- GET TIME BINS FOR GC 1 and 2 --------------------")
-    con = get_engine(return_con=True)
-    engine = get_engine()
+    con = get_engine(return_con=True, DBLOGIN_FILE="dblogin.json")
+    engine = get_engine(DBLOGIN_FILE="dblogin.json")
 
     dtype_dict = {
+        "transition_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
         "centrality_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
         "in_degree_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
         "out_degree_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
@@ -92,6 +101,7 @@ def precompute_features():
                         "user_id": str(user_id),
                         "duration": int(weeks),
                         "file_name": str(file_name),
+                        "transition_feats": transition_distribution(graph),
                         "shortest_path_feats": shortest_path_distribution(graph),
                         "centrality_feats": centrality_dist(graph),
                         "in_degree_feats": degree_dist(graph),
