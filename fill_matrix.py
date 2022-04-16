@@ -105,13 +105,13 @@ def clean_impossible_matches(df):
 
 if __name__ == "__main__":
 
-    STUDY = "gc2"
+    STUDY = "gc1"
 
     output_base_path = os.path.join("outputs", STUDY)
     os.makedirs(output_base_path, exist_ok=True)
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     print("download distances")
-    distances_query = f"SELECT * FROM {STUDY}.distance" # WHERE p_duration>16 and u_duration<16"  # for testing:
+    distances_query = f"SELECT * FROM {STUDY}.distance"  # WHERE p_duration>16 and u_duration<16"  # for testing:
     feature_cross_product_df = pd.read_sql(distances_query, con=engine)
 
     # calculate same_user_flag (important for topk acc)
@@ -126,6 +126,7 @@ if __name__ == "__main__":
             feature_cross_product_df[f"{metric}_in_degree"]
             + feature_cross_product_df[f"{metric}_out_degree"]
             + feature_cross_product_df[f"{metric}_shortest_path"]
+            + feature_cross_product_df[f"{metric}_transition"]
         )
     feature_cross_product_df["all_combined"] = (
         feature_cross_product_df["kldiv_combined"]
@@ -134,7 +135,7 @@ if __name__ == "__main__":
     )
 
     # Print out results for one case
-    DIST_COL = "all_combined"
+    DIST_COL = "mse_combined"
     mean_matrix, std_matrix = calculate_topk_accuracy(
         feature_cross_product_df, k=10, distance_column=DIST_COL
     )  # uses the column distance
@@ -154,11 +155,11 @@ if __name__ == "__main__":
     # collect all possibilities and save as csvs
     possible_cols = []
     for metric in ["kldiv", "mse", "wasserstein"]:
-        for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "combined"]:
+        for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "transition", "combined"]:
             possible_cols.append(metric + "_" + feats)
     possible_cols.append("all_combined")
 
-    for k in [0, 5, 10]:
+    for k in [0, 1, 5, 10]:
         out_path = os.path.join(output_base_path, "acc_k" + str(k))
         os.makedirs(out_path, exist_ok=True)
         # Run on all dist types
