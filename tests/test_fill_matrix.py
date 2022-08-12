@@ -41,72 +41,93 @@ df["same_user"] = df["p_user_id"] == df["u_user_id"]
 
 
 def count_matching_tasks(df):
-    return df.groupby(["p_duration", "u_duration", "p_filename", "u_filename", 'u_user_id']).size().shape[0]
+    return df.groupby(["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"]).size().shape[0]
+
 
 def list_matching_tasks(df):
-    return df.groupby(["p_duration", "u_duration", "p_filename", "u_filename", 'u_user_id']).size().index
+    return df.groupby(["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"]).size().index
+
 
 def set_task_as_success(df, p_duration, u_duration, p_filename, u_filename, u_user_id):
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] != u_user_id)].index
-    df.loc[ix, 'distance'] = range(1, len(ix) + 1)
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] != u_user_id)
+    ].index
+    df.loc[ix, "distance"] = range(1, len(ix) + 1)
 
-def filter_by_tuple (df, p_duration, u_duration, p_filename, u_filename, u_user_id):
-        ix = df[(df['p_duration'] == p_duration) &
-                (df['u_duration'] == u_duration) &
-                (df['p_filename'] == p_filename) &
-                (df['u_filename'] == u_filename) &
-                (df['u_user_id'] == u_user_id)].index
-        return df.loc[ix]
+
+def filter_by_tuple(df, p_duration, u_duration, p_filename, u_filename, u_user_id):
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+    ].index
+    return df.loc[ix]
+
 
 def set_task_as_failure(df, p_duration, u_duration, p_filename, u_filename, u_user_id):
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] != u_user_id)].index
-    df.loc[ix, 'distance'] = range(0, len(ix))
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] != u_user_id)
+    ].index
+    df.loc[ix, "distance"] = range(0, len(ix))
     nb_users_in_task = len(ix)
 
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] == u_user_id)].index
-    df.loc[ix, 'distance'] = nb_users_in_task + 10
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] == u_user_id)
+    ].index
+    df.loc[ix, "distance"] = nb_users_in_task + 10
+
 
 def set_task_as_success_non_unique_ranks(df, p_duration, u_duration, p_filename, u_filename, u_user_id):
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] != u_user_id)].index
-    df.loc[ix, 'distance'] = range(0, len(ix))
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] != u_user_id)
+    ].index
+    df.loc[ix, "distance"] = range(0, len(ix))
+
 
 def set_task_as_failure_non_unique_ranks(df, p_duration, u_duration, p_filename, u_filename, u_user_id):
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] != u_user_id)].index
-    df.loc[ix, 'distance'] = [0] + list(range(0, len(ix)-1))
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] != u_user_id)
+    ].index
+    df.loc[ix, "distance"] = [0] + list(range(0, len(ix) - 1))
     nb_users_in_task = len(ix)
 
-    ix = df[(df['p_duration'] == p_duration) &
-            (df['u_duration'] == u_duration) &
-            (df['p_filename'] == p_filename) &
-            (df['u_filename'] == u_filename) &
-            (df['u_user_id'] == u_user_id) &
-            (df['p_user_id'] == u_user_id)].index
-    df.loc[ix, 'distance'] = nb_users_in_task -2
+    ix = df[
+        (df["p_duration"] == p_duration)
+        & (df["u_duration"] == u_duration)
+        & (df["p_filename"] == p_filename)
+        & (df["u_filename"] == u_filename)
+        & (df["u_user_id"] == u_user_id)
+        & (df["p_user_id"] == u_user_id)
+    ].index
+    df.loc[ix, "distance"] = nb_users_in_task - 2
+
 
 # top left elements (acc 2/3 with high std within users)
 df_ = df[(df["p_duration"] == 20) & (df["u_duration"] == 20)].sort_values(["u_user_id", "p_filename", "u_filename"])
@@ -137,15 +158,17 @@ for ix_tuple in list_matching_tasks(df_):
 
 count_matching_tasks(df_)
 
-df_ = filter_by_tuple(df, *(20, 4, '2016-11-23', '2017-04-12', '1737'))
+df_ = filter_by_tuple(df, *(20, 4, "2016-11-23", "2017-04-12", "1737"))
 
-ix_tuple = (20, 4, '2016-11-23', '2017-04-12', '1685')
+ix_tuple = (20, 4, "2016-11-23", "2017-04-12", "1685")
 p_duration, u_duration, p_filename, u_filename, u_user_id = ix_tuple
-ix = df[(df['p_duration'] == p_duration) &
-        (df['u_duration'] == u_duration) &
-        (df['p_filename'] == p_filename) &
-        (df['u_filename'] == u_filename) &
-        (df['u_user_id'] == u_user_id)].index
+ix = df[
+    (df["p_duration"] == p_duration)
+    & (df["u_duration"] == u_duration)
+    & (df["p_filename"] == p_filename)
+    & (df["u_filename"] == u_filename)
+    & (df["u_user_id"] == u_user_id)
+].index
 df_ = df.loc[ix]
 
 m1, m2 = calculate_reciprocal_rank(df_, k=k, distance_column="distance")
@@ -153,10 +176,6 @@ print(m1)
 n1, n2 = calculate_topk_accuracy(df_, k)
 print(n1)
 # acc = df_.groupby(by=[])
-
-
-
-
 
 
 # df['']
@@ -172,4 +191,4 @@ print(n1)
 # print(mean_matrix)
 # print(std_matrix)
 #
-a = df.groupby(by=['p_duration', 'u_duration']).size()
+a = df.groupby(by=["p_duration", "u_duration"]).size()

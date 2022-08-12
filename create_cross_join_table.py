@@ -1,37 +1,37 @@
-
 import sqlalchemy
 from utils import get_engine
 import os
-#SQL query
-    # this query performs a join on the feature rows. For every row it joins all possible combinations of durations
-    # under the following conditions: Musst be from the same user and it musst be after the end of the current time bin.
 
-    # To extent this query to join all possible time bin combinations add the t2.filename into the DISTINCT
-    # statement. Furthermore you have to make sure that both intervals do not overlap (e.g., by extending the
-    #  t1.enddate <= t2.filename::timestamp check.
+# SQL query
+# this query performs a join on the feature rows. For every row it joins all possible combinations of durations
+# under the following conditions: Musst be from the same user and it musst be after the end of the current time bin.
 
-    # query can be optimized by the following actions:
-        # precompute enddate
-        # cast types
-        # add indices (critical speed improvement)
+# To extent this query to join all possible time bin combinations add the t2.filename into the DISTINCT
+# statement. Furthermore you have to make sure that both intervals do not overlap (e.g., by extending the
+#  t1.enddate <= t2.filename::timestamp check.
+
+# query can be optimized by the following actions:
+# precompute enddate
+# cast types
+# add indices (critical speed improvement)
 
 # alternative with statement (replaces create temp table)
 
-    # WITH table_with_end_date AS
-    #     (SELECT *, file_name::timestamp +  (duration::text || ' week')::interval AS enddate
-    #     FROM gc1.dur_features)
+# WITH table_with_end_date AS
+#     (SELECT *, file_name::timestamp +  (duration::text || ' week')::interval AS enddate
+#     FROM gc1.dur_features)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    datasets = ['gc2', 'gc1']
+    datasets = ["gc2", "gc1"]
 
     # Threshold
     # query to determine threshold:
     # "select p_duration, p_filename, u_duration, u_filename, count(*) as count_el from gc2.dur_features_cross_join
     # group by p_duration, p_filename, u_duration, u_filename order by p_duration, u_duration, p_filename;"
 
-    dset_thresholds = {'gc1': 5000, 'gc2': 1000}
+    dset_thresholds = {"gc1": 5000, "gc2": 1000}
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     con = engine.connect()
 
@@ -104,7 +104,3 @@ if __name__ == '__main__':
             con.execute(sql_access)
         except:
             print("could not grant access to wnina")
-
-
-
-

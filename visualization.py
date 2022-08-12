@@ -53,7 +53,10 @@ def feature_comparison_table(in_path):
                 else:
                     lab = str(use_acc) + "-Accuracy"
                 feature_comp_dict[(metric, feats)].update(
-                    {(lab, "Mean"): np.nanmean(mean_acc.values), (lab, "Max"): np.nanmax(mean_acc.values),}
+                    {
+                        (lab, "Mean"): np.nanmean(mean_acc.values),
+                        (lab, "Max"): np.nanmax(mean_acc.values),
+                    }
                 )
     df_raw = pd.DataFrame(feature_comp_dict)
     df = df_raw.swapaxes(1, 0)

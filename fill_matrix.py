@@ -174,4 +174,3 @@ if __name__ == "__main__":
                 )
             mean_matrix.to_csv(os.path.join(out_path, "mean_" + dist_col + ".csv"))
             std_matrix.to_csv(os.path.join(out_path, "std_" + dist_col + ".csv"))
-
