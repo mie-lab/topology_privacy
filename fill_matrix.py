@@ -17,7 +17,6 @@ from sklearn.metrics import mean_squared_error
 
 
 def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance"):
-    # TODO: computing top-k-accuracy with this function vs the other function - results don't match
 
     df["rank"] = df.groupby(by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"])[
         distance_column
