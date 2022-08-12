@@ -5,16 +5,22 @@ from visualization import plot_intra_inter
 
 
 def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance", intra_inter_study=None):
-
+    """ 
+    Calculate reciprocal rank 
+    """
+    # compute rank for each user
     df["rank"] = df.groupby(by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"])[
         distance_column
     ].rank()
     # for comparison to other paper:
     # df[["p_user_id", "u_user_id", "rank"]].to_csv("test_data_privacy_loss_gc2.csv")
     df_rank_filtered = df[df["same_user"]]
+
+    # plot intra-inter user differences
     if intra_inter_study is not None:
         plot_intra_inter(df_rank_filtered, os.path.join("1paper", "figures", f"inter_intra_{intra_inter_study}.pdf"))
 
+    # compute reciprocal ranks
     if return_reciprocal:
         df_rank_filtered["reciprocal_rank"] = 1 / df_rank_filtered["rank"]
         matrix_elements = df_rank_filtered.groupby(by=["p_duration", "u_duration"])["reciprocal_rank"].agg(
@@ -24,19 +30,20 @@ def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column
         std_matrix = matrix_elements["std"].unstack(level=-1, fill_value=None)
         return mean_matrix, std_matrix
 
-    # for top k
+    # Compute topk accuracy
     df_rank_filtered["topk"] = (df_rank_filtered["rank"] <= k).astype(int)
     df_rank_top_acc = df_rank_filtered.groupby(by=["u_duration", "p_duration", "u_filename", "p_filename"]).agg(
         {"topk": "mean"}
     )
     matrix_elements = df_rank_top_acc.groupby(by=["p_duration", "u_duration"])["topk"].agg(["mean", "std"])
-
+    # times 100 for accuracy
     mean_matrix = matrix_elements["mean"].unstack(level=-1, fill_value=None) * 100
     std_matrix = matrix_elements["std"].unstack(level=-1, fill_value=None) * 100
     return mean_matrix, std_matrix
 
 
 def calculate_topk_accuracy(df, k, distance_column="distance"):
+    """Alternative function --> the same can also be computed with the reciprocal rank function"""
     # get best guesses per group ranks
     # get minimum row index per group for each block of [p_duration, p_user, p_start_date(=p_filename) u_duration]
     # https://stackoverflow.com/a/71130117/16232216
@@ -93,8 +100,11 @@ if __name__ == "__main__":
 
     STUDY = "gc1"
 
+    # make output dir
     output_base_path = os.path.join("outputs", STUDY)
     os.makedirs(output_base_path, exist_ok=True)
+
+    # load similarity data
     engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
     print("download distances")
     distances_query = f"SELECT * FROM {STUDY}.distance"  # WHERE p_duration>16 and u_duration<16"  # for testing:
@@ -104,6 +114,8 @@ if __name__ == "__main__":
     feature_cross_product_df["same_user"] = (
         feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
     )
+    # Impossible matches: happen when one user_id appears only in one time period but not in the other --> cannot be
+    # reidentified
     feature_cross_product_df = clean_impossible_matches(feature_cross_product_df)
 
     # Compute combined distances
@@ -114,37 +126,37 @@ if __name__ == "__main__":
             + feature_cross_product_df[f"{metric}_shortest_path"]
             + feature_cross_product_df[f"{metric}_transition"]
         )
+    # Sum up all similarities
     feature_cross_product_df["all_combined"] = (
         feature_cross_product_df["kldiv_combined"]
         + feature_cross_product_df["mse_combined"]
         + feature_cross_product_df["wasserstein_combined"]
     )
 
-    # Print out results for one case
+    # EXAMPLE: Print out results for one case for debugging
     DIST_COL = "mse_combined"
     mean_matrix, std_matrix = calculate_topk_accuracy(
         feature_cross_product_df, k=10, distance_column=DIST_COL
     )  # uses the column distance
-
     print("Output original k accuracy function:")
     print(mean_matrix)
     print(std_matrix)
-
     mean_matrix, std_matrix = calculate_reciprocal_rank(
         feature_cross_product_df, k=10, distance_column=DIST_COL, intra_inter_study=STUDY
     )
-
     print("Output new function(based on rank):")
     print(mean_matrix)
     print(std_matrix)
 
-    # collect all possibilities and save as csvs
+    # RUN for all:
+    # collect all possibilities
     possible_cols = []
     for metric in ["kldiv", "mse", "wasserstein"]:
         for feats in ["in_degree", "out_degree", "shortest_path", "centrality", "transition", "combined"]:
             possible_cols.append(metric + "_" + feats)
     possible_cols.append("all_combined")
 
+    # iterate over top-k --> 0-accuracy means reciprocal rank
     for k in [0, 1, 5, 10]:
         out_path = os.path.join(output_base_path, "acc_k" + str(k))
         os.makedirs(out_path, exist_ok=True)
@@ -155,8 +167,10 @@ if __name__ == "__main__":
                     feature_cross_product_df, return_reciprocal=True, distance_column=dist_col
                 )
             else:
+                # accuracy can also be calculated via reciprocal rank function
                 mean_matrix, std_matrix = calculate_reciprocal_rank(
                     feature_cross_product_df, k=k, distance_column=dist_col
                 )
+            # save mean and std as output
             mean_matrix.to_csv(os.path.join(out_path, "mean_" + dist_col + ".csv"))
             std_matrix.to_csv(os.path.join(out_path, "std_" + dist_col + ".csv"))
