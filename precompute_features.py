@@ -1,9 +1,5 @@
-import json
-import os
 import pandas as pd
-import psycopg2
 import numpy as np
-from sqlalchemy import create_engine
 import sqlalchemy
 
 from graph_trackintel.graph_utils import get_largest_component
