@@ -1,20 +1,6 @@
 import pandas as pd
-import numpy as np
-import sqlalchemy
-from torch import reciprocal
-from graph_trackintel.io import read_graphs_from_postgresql
 from utils import get_engine
-from pandas import DataFrame
-import networkx as nx
-from sklearn.preprocessing import normalize
 import os
-import psycopg2
-import pickle
-import warnings
-import matplotlib.pyplot as plt
-import matplotlib
-from sklearn.metrics import mean_squared_error
-
 from visualization import plot_intra_inter
 
 
