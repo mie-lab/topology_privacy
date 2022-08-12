@@ -8,7 +8,10 @@ from utils import get_engine
 
 
 def kl_div(dist1, dist2):
-    return np.sum(rel_entr(dist1, dist2), axis=1)
+    element_wise_entropy = rel_entr(dist1, dist2)
+    # need to mask out the infs
+    element_wise_entropy[element_wise_entropy == np.inf] = 0
+    return np.sum(element_wise_entropy, axis=1)
 
 
 def mse(dist1, dist2):
@@ -70,7 +73,9 @@ if __name__ == "__main__":
     df = pd.read_sql(f"SELECT * FROM {study}.dur_features_cross_join", engine)
     print("loaded data...")
 
-    df_out = get_similarity(df, ["in_degree_feats", "shortest_path_feats", "out_degree_feats", "centrality_feats"])
+    df_out = get_similarity(
+        df, ["in_degree_feats", "shortest_path_feats", "transition_feats", "out_degree_feats", "centrality_feats"]
+    )
     print("similarity computed...")
 
     df_out.to_sql("distance", engine, study, if_exists="replace")

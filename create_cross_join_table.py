@@ -52,10 +52,12 @@ if __name__ == '__main__':
             t1.user_id as p_user_id, t1.duration as p_duration, t1.file_name as p_filename, 
             t1.shortest_path_feats as p_shortest_path_feats, t1.centrality_feats as p_centrality_feats, 
             t1.in_degree_feats as p_in_degree_feats, t1.out_degree_feats as p_out_degree_feats,
+            t1.transition_feats as p_transition_feats,
             t1.enddate as enddate,
             t2.user_id as u_user_id, t2.duration as u_duration, t2.file_name as u_filename, 
             t2.shortest_path_feats as u_shortest_path_feats, t2.centrality_feats as u_centrality_feats, 
-            t2.in_degree_feats as u_in_degree_feats, t2.out_degree_feats as u_out_degree_feats
+            t2.in_degree_feats as u_in_degree_feats, t2.out_degree_feats as u_out_degree_feats,
+            t2.transition_feats as u_transition_feats
             FROM table_with_end_date t1
             join
                 {ds}.dur_features t2
