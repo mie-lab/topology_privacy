@@ -72,7 +72,7 @@ def precompute_features():
         "shortest_path_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
     }
 
-    for study in ["gc1", "gc2"]:
+    for study in ["gc1"]:
         # initialize output table
         table_precomputed_feats = []
         # Make new directory for this duration data
@@ -80,6 +80,7 @@ def precompute_features():
         for weeks in [4 * (i + 1) for i in range(7)]:
             print("processing weeks:", weeks, "STUDY", study)
             cur = con.cursor()
+
             # get the timebin names
             cur.execute(f"SELECT name FROM {study}.dur_{weeks}w")
 
