@@ -13,25 +13,40 @@ from utils import get_engine
 
 
 def normed_list(vals):
+    """Normalize to get a distribution and convert to list"""
     return (vals / np.sum(vals)).tolist()
 
 
 def degree_dist(graph, mode="in", cutoff=20):
     """
-    mode: in (=indegree), out (outdegree) or all (both)
+    Arguments:
+        graph: ActivityGraph
+        mode: {in, out, all} 
+            which degrees to use: in (=indegree), out (outdegree) or all (both)
+        cutoff: int
+            Maximum considered degree
+
+    Returns: 
+        list with the normalized distribution of highest degrees
     """
     degree_vals = get_degrees(graph, mode=mode)
     all_vals = sorted(degree_vals)
+    # put into a fixed-size array
     topk_vals = np.zeros(cutoff)  # for padding
     topk_vals[-len(all_vals) :] = all_vals[-cutoff:]
+    # noralize distribution
     return normed_list(topk_vals)
 
 
 def centrality_dist(graph, centrality_fun=betweenness_centrality):
     """
     Compute distribution of centrality in fixed size histogram vector
+
+    Arguments:
+        graph: ActivityGraph
+        centrality_fun: function dependent on which centrality to use
     Returns:
-        1D np array of length 10
+        1D np array of length 10, distribution of centralities in graph
     """
     centrality = centrality_fun(graph)
     centrality_vals = list(centrality.values())
@@ -43,13 +58,33 @@ def centrality_dist(graph, centrality_fun=betweenness_centrality):
 
 
 def shortest_path_distribution(graph, max_len=10):
+    """
+    Distribution all pair shortest path lengths
+    Arguments:
+        graph:ActivityGraph
+        max_len: Int
+            maximum considered sp length
+    Returns: 
+        list of normalized distritbuion of sp lengths
+    """
     sp_counts = sp_length(graph, max_len=max_len)
     return normed_list(sp_counts)
 
 
 def transition_distribution(graph, cutoff=20):
+    """
+    Distribution of edge transition weights
+    Arguments:
+        graph:ActivityGraph
+        cutoff: Int
+            maximum considered transition count
+    Returns: 
+        list of normalized distritbuion of highest transition counts
+    """
+    # get all transition counts
     transitions = np.array([edge[2]["weight"] for edge in graph.edges(data=True)])
     all_vals = sorted(transitions)
+    # transfer to fixed size array
     topk_vals = np.zeros(cutoff)  # for padding
     topk_vals[-len(all_vals) :] = all_vals[-cutoff:]
     return normed_list(topk_vals)
@@ -71,8 +106,7 @@ def precompute_features():
     for study in ["gc1"]:
         # initialize output table
         table_precomputed_feats = []
-        # Make new directory for this duration data
-        # Run
+        # Run for each time period
         for weeks in [4 * (i + 1) for i in range(7)]:
             print("processing weeks:", weeks, "STUDY", study)
             cur = con.cursor()
@@ -83,8 +117,10 @@ def precompute_features():
             table_name = f"dur_{weeks}w"
             all_names = cur.fetchall()
 
+            # iterate over all tables for this specific period
             for name in all_names:
                 file_name = name[0]
+                # get graphs
                 graph_dict = read_graphs_from_postgresql(
                     graph_table_name=table_name,
                     psycopg_con=con,
@@ -92,6 +128,7 @@ def precompute_features():
                     file_name=file_name,
                     decompress=True,
                 )
+                # preprocess and compute features
                 for user_id, activity_graph in graph_dict.items():
                     graph = get_largest_component(activity_graph.G)
                     feat_dict = {
@@ -104,6 +141,7 @@ def precompute_features():
                         "in_degree_feats": degree_dist(graph),
                         "out_degree_feats": degree_dist(graph, mode="out"),
                     }
+                    # compute features
                     table_precomputed_feats.append(feat_dict)
 
             # write to db

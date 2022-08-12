@@ -8,10 +8,22 @@ from sklearn.linear_model import LinearRegression
 
 
 def plot_matrix(mean, std=None, save_path=None):
+    """
+    Main plot: Matrix with reidentification accuracy
+    Arguments:
+        mean: np array
+            mean accuracy for all combinations
+        std: Optional np array (same shape as mean)
+            Can be provided to be added in the matrix
+        save_path: str
+            filepath to save the figure
+    """
+    # set std to nan if not provided
     if std is None:
         std = np.zeros(mean.shape) + np.nan
 
     def data_to_label(data, text):
+        """Construct cell labels from mean and std"""
         label = []
         for data, text in zip(data.flatten(), text.flatten()):
             if pd.isna(text):
@@ -21,8 +33,10 @@ def plot_matrix(mean, std=None, save_path=None):
         return np.asarray(label).reshape(mean.shape)
 
     sns.set(font_scale=1.7)
+    # construct labels
     labels = data_to_label(np.array(mean), np.array(std))
     print(labels.shape, mean.shape)
+    # make heatmap with labels in the cells
     plt.figure(figsize=(10, 8))
     sns.heatmap(mean, annot=labels, fmt="", cmap="YlGnBu")
     plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
@@ -37,13 +51,21 @@ def plot_matrix(mean, std=None, save_path=None):
 
 
 def feature_comparison_table(in_path):
+    """
+    Compare which features enable reidentification
+    in_path: str
+        Path to matrices with reidentification performances
+    """
     feature_comp_dict = {}
+    # For all metrics and features
     for metric in ["kldiv", "mse", "wasserstein", "all"]:
         for feats in ["transition", "in_degree", "out_degree", "shortest_path", "centrality", "combined"]:
             if metric == "all" and feats != "combined":
                 continue
             feature_comp_dict[(metric, feats)] = {}
+            # for all accuracy conditions
             for use_acc in [0, 1, 5, 10]:
+                # read mean accuracy values
                 mean_acc = pd.read_csv(
                     os.path.join(in_path, study, "acc_k" + str(use_acc), f"mean_{metric}_{feats}.csv"),
                     index_col="p_duration",
@@ -52,12 +74,11 @@ def feature_comparison_table(in_path):
                     lab = "Recip. rank"
                 else:
                     lab = str(use_acc) + "-Accuracy"
+                # save in dictionary
                 feature_comp_dict[(metric, feats)].update(
-                    {
-                        (lab, "Mean"): np.nanmean(mean_acc.values),
-                        (lab, "Max"): np.nanmax(mean_acc.values),
-                    }
+                    {(lab, "Mean"): np.nanmean(mean_acc.values), (lab, "Max"): np.nanmax(mean_acc.values),}
                 )
+    # output table in latex format
     df_raw = pd.DataFrame(feature_comp_dict)
     df = df_raw.swapaxes(1, 0)
     print(df)
@@ -65,6 +86,14 @@ def feature_comparison_table(in_path):
 
 
 def plot_intra_inter(rank_df, save_path=None):
+    """
+    Compare intra and inter user differences - 
+    Is the variance explained by differences between users or by differences between time periods?
+    Arguments:
+        rank_df: Dataframe with the rank of the ground-truth match for each user in each time period
+        save_path: str - Filepath
+    Saves bar plot if save_path is provided
+    """
     # intra user
     std_rank_per_user = (
         rank_df.groupby(["p_duration", "u_user_id"])
@@ -81,30 +110,7 @@ def plot_intra_inter(rank_df, save_path=None):
     )
     inter_user = std_rank_per_bin.reset_index().groupby("p_duration").agg({"rank_std": ["mean", "std"]})
 
-    # offset = 0.25
-    # plt.errorbar(
-    #     inter_user.index - offset,
-    #     inter_user[("rank_std", "mean")],
-    #     yerr=inter_user[("rank_std", "std")],
-    #     fmt="o",
-    #     ecolor="r",
-    #     color="r",
-    #     markersize=10,
-    # )
-    # plt.errorbar(
-    #     intra_user.index + offset,
-    #     intra_user[("rank_std", "mean")],
-    #     yerr=intra_user[("rank_std", "std")],
-    #     fmt="o",
-    #     ecolor="b",
-    #     color="b",
-    #     markersize=10,
-    # )
-    # legend_elements = [
-    #     Line2D([0], [0], marker="o", color="b", lw=2, label="Intra-user std", markerfacecolor="b", markersize=10),
-    #     Line2D([0], [0], marker="o", color="r", lw=2, label="Inter-user std", markerfacecolor="r", markersize=10),
-    # ]
-    # plt.legend(handles=legend_elements, loc="lower left", fontsize=14)
+    # Barplot
     width = 1
     offset = width / 2
     plt.bar(inter_user.index - offset, inter_user[("rank_std", "mean")], width=width, label="Inter user")
@@ -122,7 +128,15 @@ def plot_intra_inter(rank_df, save_path=None):
 
 
 def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path):
+    """Plot privacy loss according to Manousakas et al (Figure 3 in paper)
 
+    Parameters
+    ----------
+    gc1_ranks : Rank of real user id in matching 
+    gc2_ranks : Rank of real user id in matching (gc2 dataset)
+    save_path : std
+        filepath to save output figure
+    """
     # implementation of privacy loss according to paper
     def prob_informed(rank_df):
         rank_df["recip_rank"] = rank_df["rank"].apply(lambda x: 1 / x)
@@ -172,18 +186,28 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path):
 
 
 def regression_analysis(in_path="../topology_privacy/outputs/gc1"):
+    """
+    Analyze the influence of pool and test tracking duration on the matching accuracy
+    Loads the MSE matrix, applies regression analysis and prints the result as a latex table.
+    """
     out_df = {}
     for k in [0, 1, 5, 10]:
+        # load matrix
         res = pd.read_csv(os.path.join(in_path, f"acc_k{k}", "mean_mse_combined.csv"), index_col="p_duration")
         res_arr = np.array(res)
         months_p, months_u = np.where(res_arr)
+        # duration difference
         diff = np.abs(months_p - months_u)
+        # Run linear regression
         X = (np.array(list(zip(months_p + 1, months_u + 1, diff)))) * 4
         Y = res_arr.flatten()
         X = X[~np.isnan(Y)]
         Y = Y[~np.isnan(Y)]
         reg = LinearRegression().fit(X, Y)
+        # save coefficients
         out_df[k] = reg.coef_.tolist() + [reg.intercept_]
+
+    # rename for clean table
     out_df = (
         pd.DataFrame(out_df)
         .rename(
@@ -197,6 +221,7 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1"):
         )
         .swapaxes(1, 0)
     )
+    # output
     print(out_df)
     print(out_df.to_latex(float_format="%.2f"))
 
@@ -208,8 +233,9 @@ if __name__ == "__main__":
     save_path = os.path.join("1paper", "figures", "results")
     use_metric = "mse_combined"
 
-    # plot matrix
+    # plot matrix for each accuracy
     for acc in ["acc_k0", "acc_k1", "acc_k5", "acc_k10"]:
+        # read mean and std of matching performance
         mean = pd.read_csv(os.path.join(in_path, acc, f"mean_{use_metric}.csv"), index_col="p_duration")
         std = pd.read_csv(os.path.join(in_path, acc, f"std_{use_metric}.csv"), index_col="p_duration")
         out_name = f"{study}_{acc}_{use_metric}.pdf"
@@ -217,4 +243,6 @@ if __name__ == "__main__":
 
     # Table for feature comparison
     feature_comparison_table("outputs")
+
+    # Regression analysis (Table 1 in paper)
     regression_analysis()
