@@ -23,7 +23,6 @@ import os
 
 
 if __name__ == "__main__":
-
     datasets = ["gc2", "gc1"]
 
     # Threshold
@@ -64,9 +63,7 @@ if __name__ == "__main__":
                 ON
                 t1.enddate <= t2.file_name::timestamp
             ORDER
-            BY t1.user_id, t1.duration, t1.file_name, t2.user_id, t2.duration, t2.file_name::timestamp;
-            
-            
+            BY t1.user_id, t1.duration, t1.file_name, t2.user_id, t2.duration, t2.file_name::timestamp;  
         """
 
         con.execute(sql_query)

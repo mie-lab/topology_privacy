@@ -25,7 +25,7 @@ for k in [0, 5, 10]:
     temp_list = reg.coef_.tolist() + [reg.intercept_]
 
     # todo: results of table 1 are calculated but not stored
-    row_dict_list.append("Coefficient pool duration": 1)
+    row_dict_list.append("Coefficient pool duration")
 
 
 
