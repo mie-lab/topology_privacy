@@ -103,11 +103,11 @@ def precompute_features():
         "shortest_path_feats": sqlalchemy.ARRAY(sqlalchemy.types.REAL),
     }
 
-    for study in ["gc1"]:
+    for study in ["gc1", "gc2"]:
         # initialize output table
         table_precomputed_feats = []
         # Run for each time period
-        for weeks in [4 * (i + 1) for i in range(7)]:
+        for weeks in [1] + [4 * (i + 1) for i in range(7)]:
             print("processing weeks:", weeks, "STUDY", study)
             cur = con.cursor()
 
@@ -132,6 +132,7 @@ def precompute_features():
                 for user_id, activity_graph in graph_dict.items():
                     graph = get_largest_component(activity_graph.G)
                     feat_dict = {
+                        "study": study,
                         "user_id": str(user_id),
                         "duration": int(weeks),
                         "file_name": str(file_name),
@@ -146,7 +147,7 @@ def precompute_features():
 
             # write to db
             df_feats = pd.DataFrame(table_precomputed_feats)
-            df_feats.to_sql("dur_features", engine, study, if_exists="replace", dtype=dtype_dict)
+            df_feats.to_sql("dur_features_1w", engine, study, if_exists="replace", dtype=dtype_dict)
             print("written to db")
 
 

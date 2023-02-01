@@ -43,7 +43,7 @@ if __name__ == "__main__":
         
         WITH table_with_end_date AS
             (SELECT *, file_name::timestamp +  (duration::text || ' week')::interval AS enddate
-            FROM {ds}.dur_features)
+            FROM {ds}.dur_features_1w)
         
         SELECT
             DISTINCT
@@ -59,7 +59,7 @@ if __name__ == "__main__":
             t2.transition_feats as u_transition_feats
             FROM table_with_end_date t1
             join
-                {ds}.dur_features t2
+                {ds}.dur_features_1w t2
                 ON
                 t1.enddate <= t2.file_name::timestamp
             ORDER
