@@ -37,9 +37,9 @@ if __name__ == "__main__":
     for ds in datasets:
         print(ds)
         sql_query = f"""
-        DROP TABLE if EXISTS {ds}.dur_features_cross_join;
+        DROP TABLE if EXISTS {ds}.dur_features_cross_join_1w;
         
-        create table {ds}.dur_features_cross_join as
+        create table {ds}.dur_features_cross_join_1w as
         
         WITH table_with_end_date AS
             (SELECT *, file_name::timestamp +  (duration::text || ' week')::interval AS enddate
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         
         SELECT
             DISTINCT
-            ON(t1.user_id, t1.duration, t1.file_name, t2.user_id, t2.duration)
+            ON(t1.user_id, t1.duration, t1.file_name::timestamp, t2.user_id, t2.duration, t2.file_name::timestamp)
             t1.user_id as p_user_id, t1.duration as p_duration, t1.file_name as p_filename, 
             t1.shortest_path_feats as p_shortest_path_feats, t1.centrality_feats as p_centrality_feats, 
             t1.in_degree_feats as p_in_degree_feats, t1.out_degree_feats as p_out_degree_feats,
@@ -63,11 +63,11 @@ if __name__ == "__main__":
                 ON
                 t1.enddate <= t2.file_name::timestamp
             ORDER
-            BY t1.user_id, t1.duration, t1.file_name, t2.user_id, t2.duration, t2.file_name::timestamp;  
+            BY t1.user_id, t1.duration, t1.file_name::timestamp, t2.user_id, t2.duration, t2.file_name::timestamp;  
         """
 
         con.execute(sql_query)
-        con.execute(f"ALTER TABLE {ds}.dur_features_cross_join ADD COLUMN postgres_id SERIAL PRIMARY KEY;")
+        con.execute(f"ALTER TABLE {ds}.dur_features_cross_join_1w ADD COLUMN postgres_id SERIAL PRIMARY KEY;")
 
         # Delete (p_duration, p_filename, u_duration, u_filename) with very few observations.
         # The SQL query always choses the next possible non-overlapping time bin (=u_filename) for a
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             ids_by_count as (
                 SELECT array_agg(postgres_id) AS postgres_ids, p_duration, p_filename, u_duration, u_filename, 
                     count(*) AS count_el 
-                FROM {ds}.dur_features_cross_join 
+                FROM {ds}.dur_features_cross_join_1w 
                 GROUP BY p_duration, p_filename, u_duration, 
                     u_filename HAVING count(*) < {dset_thresholds[ds]} 
                 ORDER BY p_duration, u_duration, p_filename),
@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 SELECT array_agg(postgres_ids_unnest) AS id_array 
                 FROM ids_by_count, unnest(postgres_ids) AS postgres_ids_unnest)
     
-        DELETE FROM {ds}.dur_features_cross_join 
+        DELETE FROM {ds}.dur_features_cross_join_1w
         WHERE postgres_id = ANY(
             SELECT unnest(id_array) FROM invalid_id_list);
         """
