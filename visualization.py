@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
+from utils import get_engine
 
 
-def plot_matrix(mean, std=None, save_path=None):
+def plot_matrix(mean, std=None, save_path=None, include_1week=True):
     """
     Main plot: Matrix with reidentification accuracy
     Arguments:
@@ -39,8 +40,12 @@ def plot_matrix(mean, std=None, save_path=None):
     # make heatmap with labels in the cells
     plt.figure(figsize=(10, 8))
     sns.heatmap(mean, annot=labels, fmt="", cmap="YlGnBu")
-    plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
-    plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
+    if include_1week:
+        plt.xticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist())
+        plt.yticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist())
+    else:
+        plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
+        plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
     plt.xlabel("Duration user", fontsize=25)
     plt.ylabel("Duration pool", fontsize=25)
     plt.tight_layout()
@@ -50,7 +55,7 @@ def plot_matrix(mean, std=None, save_path=None):
         plt.show()
 
 
-def feature_comparison_table(in_path):
+def feature_comparison_table(in_path, out_path="1journal_paper"):
     """
     Compare which features enable reidentification
     in_path: str
@@ -82,10 +87,11 @@ def feature_comparison_table(in_path):
     df_raw = pd.DataFrame(feature_comp_dict)
     df = df_raw.swapaxes(1, 0)
     print(df)
-    print(df.to_latex(float_format="%.2f"))
+    with open(out_path, "w") as outfile:
+        print(df.to_latex(float_format="%.2f"), file=outfile)
 
 
-def plot_intra_inter(rank_df, save_path=None):
+def plot_intra_inter(rank_df, save_path="1journal_paper"):
     """
     Compare intra and inter user differences - 
     Is the variance explained by differences between users or by differences between time periods?
@@ -94,6 +100,7 @@ def plot_intra_inter(rank_df, save_path=None):
         save_path: str - Filepath
     Saves bar plot if save_path is provided
     """
+    rank_df = rank_df[(rank_df["u_duration"] != 2) & (rank_df["p_duration"] != 2)]
     # intra user
     std_rank_per_user = (
         rank_df.groupby(["p_duration", "u_user_id"])
@@ -111,7 +118,7 @@ def plot_intra_inter(rank_df, save_path=None):
     inter_user = std_rank_per_bin.reset_index().groupby("p_duration").agg({"rank_std": ["mean", "std"]})
 
     # Barplot
-    width = 1
+    width = 0.75
     offset = width / 2
     plt.bar(inter_user.index - offset, inter_user[("rank_std", "mean")], width=width, label="Inter user")
     plt.bar(intra_user.index + offset, intra_user[("rank_std", "mean")], width=width, label="Intra user")
@@ -127,7 +134,7 @@ def plot_intra_inter(rank_df, save_path=None):
         plt.show()
 
 
-def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path):
+def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
     """Plot privacy loss according to Manousakas et al (Figure 3 in paper)
 
     Parameters
@@ -185,7 +192,7 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path):
     plt.show()
 
 
-def regression_analysis(in_path="../topology_privacy/outputs/gc1"):
+def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1journal_paper"):
     """
     Analyze the influence of pool and test tracking duration on the matching accuracy
     Loads the MSE matrix, applies regression analysis and prints the result as a latex table.
@@ -223,15 +230,21 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1"):
     )
     # output
     print(out_df)
-    print(out_df.to_latex(float_format="%.2f"))
+
+    with open(out_path, "w") as outfile:
+        print(out_df.to_latex(float_format="%.2f"), file=outfile)
 
 
 if __name__ == "__main__":
-    study = "gc1"
+    engine = get_engine(DBLOGIN_FILE="dblogin.json")
+    study = "gc2"
+    out_path = "1journal_paper"
 
     in_path = os.path.join("outputs", study)
-    save_path = os.path.join("1paper", "figures", "results")
     use_metric = "mse_combined"
+
+    df_rank = pd.read_sql(f"SELECT * FROM {study}.user_ranking_{use_metric}", engine)
+    plot_intra_inter(df_rank, os.path.join(out_path, f"{study}_inter_intra.pdf"))
 
     # plot matrix for each accuracy
     for acc in ["acc_k0", "acc_k1", "acc_k5", "acc_k10"]:
@@ -239,10 +252,17 @@ if __name__ == "__main__":
         mean = pd.read_csv(os.path.join(in_path, acc, f"mean_{use_metric}.csv"), index_col="p_duration")
         std = pd.read_csv(os.path.join(in_path, acc, f"std_{use_metric}.csv"), index_col="p_duration")
         out_name = f"{study}_{acc}_{use_metric}.pdf"
-        plot_matrix(mean, std, os.path.join(save_path, out_name))
+        plot_matrix(mean, std, os.path.join(out_path, out_name))
 
     # Table for feature comparison
-    feature_comparison_table("outputs")
+    feature_comparison_table("outputs", out_path=os.path.join(out_path, f"{study}_feature_comparison.txt"))
 
     # Regression analysis (Table 1 in paper)
-    regression_analysis()
+    regression_analysis(
+        in_path=os.path.join("outputs", study), out_path=os.path.join(out_path, f"{study}_regression_analysis.txt")
+    )
+
+    # # privacy loss plot
+    # gc1_ranks = pd.read_sql(f"SELECT * FROM gc1.user_ranking_{use_metric}", engine)
+    # gc2_ranks = pd.read_sql(f"SELECT * FROM gc2.user_ranking_{use_metric}", engine)
+    # privacy_loss_plot(gc1_ranks, gc2_ranks, out_path)

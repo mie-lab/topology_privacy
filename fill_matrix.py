@@ -4,17 +4,10 @@ import os
 from visualization import plot_intra_inter
 
 
-def calculate_reciprocal_rank(
-    df_rank_filtered, k=10, return_reciprocal=False, distance_column="distance", intra_inter_study=None
-):
+def calculate_reciprocal_rank(df_rank_filtered, k=10, return_reciprocal=False):
     """ 
     Calculate reciprocal rank 
     """
-
-    # plot intra-inter user differences
-    if intra_inter_study is not None:
-        plot_intra_inter(df_rank_filtered, os.path.join("1paper", "figures", f"inter_intra_{intra_inter_study}.pdf"))
-
     # compute reciprocal ranks
     if return_reciprocal:
         df_rank_filtered["reciprocal_rank"] = 1 / df_rank_filtered["rank"]
