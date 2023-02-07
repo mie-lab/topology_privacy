@@ -107,7 +107,7 @@ def precompute_features():
         # initialize output table
         table_precomputed_feats = []
         # Run for each time period
-        for weeks in [1] + [4 * (i + 1) for i in range(7)]:
+        for weeks in [1, 2]  + [4 * (i + 1) for i in range(7)]:
             print("processing weeks:", weeks, "STUDY", study)
             cur = con.cursor()
 
@@ -131,6 +131,9 @@ def precompute_features():
                 # preprocess and compute features
                 for user_id, activity_graph in graph_dict.items():
                     graph = get_largest_component(activity_graph.G)
+                    if graph.number_of_nodes() < 2:
+                        print("Not enought nodes")
+                        continue
                     feat_dict = {
                         "study": study,
                         "user_id": str(user_id),
@@ -145,10 +148,10 @@ def precompute_features():
                     # compute features
                     table_precomputed_feats.append(feat_dict)
 
-            # write to db
-            df_feats = pd.DataFrame(table_precomputed_feats)
-            df_feats.to_sql("dur_features_1w", engine, study, if_exists="replace", dtype=dtype_dict)
-            print("written to db")
+        # write to db
+        df_feats = pd.DataFrame(table_precomputed_feats)
+        df_feats.to_sql("dur_features_1w", engine, study, if_exists="append", dtype=dtype_dict)
+        print("written to db")
 
 
 if __name__ == "__main__":

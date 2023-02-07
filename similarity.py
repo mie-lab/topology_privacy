@@ -69,7 +69,7 @@ def get_similarity(df, columns_for_similarity, metric="kldiv"):
         # transform df input cols to numpy arrays
         feats_pool = get_array_from_df("p_" + col)
         feats_user = get_array_from_df("u_" + col)
-        print(feats_user.shape, feats_pool.shape)
+        # print(feats_user.shape, feats_pool.shape)
 
         # compute divergence
         for metric in ["kldiv", "mse", "wasserstein"]:
@@ -84,22 +84,39 @@ def get_similarity(df, columns_for_similarity, metric="kldiv"):
 
 if __name__ == "__main__":
 
-    study = "gc1"
+    study = "gc2"
 
     # retrieve data
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
 
     # load cross join table
     tic = time.time()
-    df = pd.read_sql(f"SELECT * FROM {study}.dur_features_cross_join", engine)
-    print("loaded data...")
+    chunksize = 50000
+    # GC1
+    max_id = 1019791  #  109206234 GC1 all combinations
+    min_id = 1  #  14672
+    nr_chunks = ((max_id - min_id) // chunksize) + 1
+    for i in range(nr_chunks):
+        start_id = min_id + i * chunksize
+        end_id = min_id + (i + 1) * chunksize
+        df = pd.read_sql(
+            f"SELECT * FROM {study}.dur_features_cross_join_1w WHERE postgres_id>={start_id} AND postgres_id < {end_id}",
+            engine,
+        )
+        if len(df) == 0:
+            print("no data")
+            continue
 
-    # Compute similarities for each combination in cross join table
-    df_out = get_similarity(
-        df, ["in_degree_feats", "shortest_path_feats", "transition_feats", "out_degree_feats", "centrality_feats"]
-    )
-    print("similarity computed...")
+        # Compute similarities for each combination in cross join table
+        df_out = get_similarity(
+            df, ["in_degree_feats", "shortest_path_feats", "transition_feats", "out_degree_feats", "centrality_feats"]
+        )
+        # print("similarity computed...")
 
-    # write to database
-    df_out.to_sql("distance", engine, study, if_exists="replace")
-    print("written to db, time for processing", time.time() - tic)
+        # write to database
+        df_out.to_sql("distance_1w", engine, study, if_exists="append")
+
+        print(
+            "Wrote ID ", start_id, "until", end_id, "to database", df["p_duration"].unique(), df["p_filename"].unique()
+        )
+    print("Finished, time for processing", time.time() - tic)
