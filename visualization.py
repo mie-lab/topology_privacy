@@ -145,23 +145,18 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
         filepath to save output figure
     """
     # implementation of privacy loss according to paper
-    def prob_informed(rank_df):
-        rank_df["recip_rank"] = rank_df["rank"].apply(lambda x: 1 / x)
-        sum_recip_rank = rank_df.groupby("u_user_id").agg({"recip_rank": "sum"})
-        rank_df = rank_df.merge(sum_recip_rank, how="left", left_on="u_user_id", right_index=True)
-        rank_df["prob_informed"] = rank_df["recip_rank_x"] / rank_df["recip_rank_y"]
+    def privacy_loss(rank_df, nr_users):
+        rank_df["recip_rank"] = 1 / rank_df["rank"]
+        sum_all_recip_ranks = np.sum([1 / (i + 1) for i in range(nr_users)])
+        # sum_recip_rank = rank_df.groupby("u_user_id").agg({"recip_rank": "sum"})
+        # rank_df = rank_df.merge(sum_recip_rank, how="left", left_on="u_user_id", right_index=True)
+        rank_df["prob_informed"] = rank_df["recip_rank"] / sum_all_recip_ranks
+        # divide the informed prob by the uninformed prob (just random pick of the users, so 1 / nr of users)
+        rank_df["privacy_loss"] = rank_df["prob_informed"] / (1 / nr_users) - 1
         return rank_df
 
-    def privacy_loss(rank_df, nr_ranks):
-        rank_df_same_user = rank_df[rank_df["p_user_id"] == rank_df["u_user_id"]]
-        rank_df_same_user["privacy_loss"] = rank_df_same_user["prob_informed"] / (1 / nr_ranks) - 1
-        return rank_df_same_user
-
-    prob_informed_df = prob_informed(gc1_ranks.copy())
-    out_gc1 = privacy_loss(prob_informed_df, len(prob_informed_df["p_user_id"].unique()))
-
-    prob_informed_df = prob_informed(gc2_ranks.copy())
-    out_gc2 = privacy_loss(prob_informed_df, len(prob_informed_df["p_user_id"].unique()))
+    out_gc1 = privacy_loss(gc1_ranks.copy(), gc1_ranks["u_user_id"].nunique())
+    out_gc2 = privacy_loss(gc2_ranks.copy(), nr_users = gc2_ranks["u_user_id"].nunique())
     print("Median privacy loss")
     print(
         np.median(out_gc1["privacy_loss"]),
@@ -171,8 +166,8 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
         np.mean(out_gc2["privacy_loss"]),
     )
     print("Decrease of rank")
-    print(np.mean(out_gc1["rank"]), "vs random strategy", len(gc1_ranks["p_user_id"].unique()) // 2)
-    print(np.mean(out_gc2["rank"]), "vs random strategy", len(gc2_ranks["p_user_id"].unique()) // 2)
+    print(np.mean(out_gc1["rank"]), "vs random strategy", gc1_ranks["u_user_id"].nunique() // 2)
+    print(np.mean(out_gc2["rank"]), "vs random strategy", gc2_ranks["u_user_id"].nunique() // 2)
     plt.rcParams.update({"font.size": 15})
 
     plt.figure(figsize=(5, 5))
@@ -181,15 +176,16 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
     plt.ylabel("Rank")
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, "rank_dist.pdf"))
-    plt.show()
+    # plt.show()
 
     plt.figure(figsize=(5, 5))
     plt.boxplot([out_gc1["privacy_loss"], out_gc2["privacy_loss"]])
     plt.xticks([1, 2], ["Green Class 1", "Green Class 2"])
     plt.ylabel("Privacy loss")
+    plt.ylim(-1, 5)
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, "privacy_loss.pdf"))
-    plt.show()
+    # plt.show()
 
 
 def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1journal_paper"):
@@ -291,10 +287,14 @@ if __name__ == "__main__":
     )
 
     # # privacy loss plot
-    # gc1_ranks = pd.read_sql(f"SELECT * FROM gc1.user_ranking_{use_metric}", engine)
-    # gc2_ranks = pd.read_sql(f"SELECT * FROM gc2.user_ranking_{use_metric}", engine)
+    # gc1_ranks = pd.read_sql(
+    #     f"SELECT * FROM gc1.user_ranking_{use_metric}  WHERE u_duration=28 AND p_duration=28", engine
+    # )
+    # gc2_ranks = pd.read_sql(
+    #     f"SELECT * FROM gc2.user_ranking_{use_metric} WHERE u_duration=28 AND p_duration=28", engine
+    # )
     # privacy_loss_plot(gc1_ranks, gc2_ranks, out_path)
 
     # # duration inbetween plot
-    df_rank = pd.read_sql(f"SELECT * FROM gc1.user_ranking_inbetween_experiment", engine)
-    inbetween_analysis(df_rank, out_path)
+    # df_rank = pd.read_sql(f"SELECT * FROM gc1.user_ranking_inbetween_experiment", engine)
+    # inbetween_analysis(df_rank, out_path)
