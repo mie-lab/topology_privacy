@@ -235,6 +235,34 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1jo
         print(out_df.to_latex(float_format="%.2f"), file=outfile)
 
 
+def inbetween_analysis(df_rank, out_path="1journal_paper"):
+    assert all(df_rank["u_filename"] > df_rank["p_filename"])
+    # convert to datatime
+    df_rank["p_filename"] = pd.to_datetime(df_rank["p_filename"])
+    df_rank["u_filename"] = pd.to_datetime(df_rank["u_filename"])
+    df_rank["Weeks between pool-bin and user-bin"] = (
+        (df_rank["u_filename"] - df_rank["p_filename"]).dt.total_seconds() / (3600 * 24 * 7)
+    ).astype(int)
+    df_rank["Reciprocal rank"] = 1 / df_rank["rank"]
+
+    sns.set(font_scale=1.4)
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(9, 4.5))
+    sns.barplot(
+        data=df_rank,
+        x="Weeks between pool-bin and user-bin",
+        y="Reciprocal rank",
+        hatch="/",
+        edgecolor="black",
+        color="lightgrey",
+    )
+    plt.tight_layout()
+    if out_path is not None:
+        plt.savefig(os.path.join(out_path, "inbetween_experiment.pdf"))
+    else:
+        plt.show()
+
+
 if __name__ == "__main__":
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
     study = "gc2"
@@ -266,3 +294,7 @@ if __name__ == "__main__":
     # gc1_ranks = pd.read_sql(f"SELECT * FROM gc1.user_ranking_{use_metric}", engine)
     # gc2_ranks = pd.read_sql(f"SELECT * FROM gc2.user_ranking_{use_metric}", engine)
     # privacy_loss_plot(gc1_ranks, gc2_ranks, out_path)
+
+    # # duration inbetween plot
+    df_rank = pd.read_sql(f"SELECT * FROM gc1.user_ranking_inbetween_experiment", engine)
+    inbetween_analysis(df_rank, out_path)
