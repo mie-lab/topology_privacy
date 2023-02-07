@@ -47,7 +47,7 @@ if __name__ == "__main__":
         
         SELECT
             DISTINCT
-            ON(t1.user_id, t1.duration, t1.file_name::timestamp, t2.user_id, t2.duration, t2.file_name::timestamp)
+            ON(t1.user_id, t1.duration, t1.file_name::timestamp, t2.user_id, t2.duration)
             t1.user_id as p_user_id, t1.duration as p_duration, t1.file_name as p_filename, 
             t1.shortest_path_feats as p_shortest_path_feats, t1.centrality_feats as p_centrality_feats, 
             t1.in_degree_feats as p_in_degree_feats, t1.out_degree_feats as p_out_degree_feats,
