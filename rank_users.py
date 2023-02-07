@@ -17,9 +17,11 @@ def clean_impossible_matches(df):
     return df.drop(df_ix_to_delete)
 
 
-def rank_users(engine, study="gc1", table_name="distance_1w"):
-
-    distances_query = f"SELECT * FROM {study}.{table_name}"  # WHERE p_duration=28 and u_duration=28"
+def rank_users(engine, study="gc1", table_name="distance_1w", u_duration=0):
+    if u_duration == 0:
+        distances_query = f"SELECT * FROM {study}.{table_name}"
+    else:
+        distances_query = f"SELECT * FROM {study}.{table_name} WHERE u_duration={u_duration}"
     feature_cross_product_df = pd.read_sql(distances_query, con=engine)
     feature_cross_product_df["same_user"] = (
         feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
@@ -59,10 +61,21 @@ def rank_users(engine, study="gc1", table_name="distance_1w"):
         df_rank_filtered = df_rank_filtered[
             ["p_duration", "p_filename", "u_user_id", "u_duration", "u_filename", "rank"]
         ]
-        df_rank_filtered.to_sql("user_ranking_" + dist_col, engine, study, if_exists="replace")
+        df_rank_filtered.to_sql("user_ranking_" + dist_col, engine, study, if_exists="append")
         print("Ranks written to DB for distance", dist_col, len(df_rank_filtered), df_rank_filtered["rank"].mean())
 
 
 if __name__ == "__main__":
+
+    STUDY = "gc1"
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
-    rank_users(engine, "gc1")
+
+    if STUDY == "gc2":
+        # for GC2: just process all at once
+        rank_users(engine, "gc2", u_duration=0)
+    elif STUDY == "gc1":
+        # create an index, then process each duration separately
+        # CREATE INDEX index_dur ON gc1.distance_1w (u_duration);
+        for u_duration in [1, 2] + [4 * (i + 1) for i in range(7)]:
+            print("------------ Starting u duration", u_duration)
+            rank_users(engine, "gc1", u_duration=u_duration)

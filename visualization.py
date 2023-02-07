@@ -33,7 +33,7 @@ def plot_matrix(mean, std=None, save_path=None, include_1week=True):
                 label.append("{0:.2f}\n".format(data) + "\u00B1" + "{0:.2f}".format(text))
         return np.asarray(label).reshape(mean.shape)
 
-    sns.set(font_scale=1.7)
+    sns.set(font_scale=1.5)
     # construct labels
     labels = data_to_label(np.array(mean), np.array(std))
     print(labels.shape, mean.shape)
@@ -41,11 +41,11 @@ def plot_matrix(mean, std=None, save_path=None, include_1week=True):
     plt.figure(figsize=(10, 8))
     sns.heatmap(mean, annot=labels, fmt="", cmap="YlGnBu")
     if include_1week:
-        plt.xticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist())
-        plt.yticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist())
+        plt.xticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=20)
+        plt.yticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=20)
     else:
-        plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
-        plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4))
+        plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
+        plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
     plt.xlabel("Duration user", fontsize=25)
     plt.ylabel("Duration pool", fontsize=25)
     plt.tight_layout()
@@ -156,7 +156,7 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
         return rank_df
 
     out_gc1 = privacy_loss(gc1_ranks.copy(), gc1_ranks["u_user_id"].nunique())
-    out_gc2 = privacy_loss(gc2_ranks.copy(), nr_users = gc2_ranks["u_user_id"].nunique())
+    out_gc2 = privacy_loss(gc2_ranks.copy(), nr_users=gc2_ranks["u_user_id"].nunique())
     print("Median privacy loss")
     print(
         np.median(out_gc1["privacy_loss"]),
@@ -261,7 +261,7 @@ def inbetween_analysis(df_rank, out_path="1journal_paper"):
 
 if __name__ == "__main__":
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
-    study = "gc2"
+    study = "gc1"
     out_path = "1journal_paper"
 
     in_path = os.path.join("outputs", study)

@@ -84,7 +84,7 @@ def get_similarity(df, columns_for_similarity, metric="kldiv"):
 
 if __name__ == "__main__":
 
-    study = "gc2"
+    study = "gc1"
 
     # retrieve data
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     tic = time.time()
     chunksize = 50000
     # GC1
-    max_id = 1019791  #  109206234 GC1 all combinations
+    max_id = 13056772  # GC2: 1019791  #  109206234 GC1 all combinations
     min_id = 1  #  14672
     nr_chunks = ((max_id - min_id) // chunksize) + 1
     for i in range(nr_chunks):

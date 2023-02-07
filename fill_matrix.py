@@ -94,12 +94,10 @@ if __name__ == "__main__":
         for dist_col in possible_cols:
             df_rank = pd.read_sql(f"SELECT * FROM {STUDY}.user_ranking_{dist_col}", engine)
             if k == 0:  # encoding for reciprocal rank:
-                mean_matrix, std_matrix = calculate_reciprocal_rank(
-                    df_rank, return_reciprocal=True, distance_column=dist_col
-                )
+                mean_matrix, std_matrix = calculate_reciprocal_rank(df_rank, return_reciprocal=True)
             else:
                 # accuracy can also be calculated via reciprocal rank function
-                mean_matrix, std_matrix = calculate_reciprocal_rank(df_rank, k=k, distance_column=dist_col)
+                mean_matrix, std_matrix = calculate_reciprocal_rank(df_rank, k=k)
             # save mean and std as output
             mean_matrix.to_csv(os.path.join(out_path, "mean_" + dist_col + ".csv"))
             std_matrix.to_csv(os.path.join(out_path, "std_" + dist_col + ".csv"))
