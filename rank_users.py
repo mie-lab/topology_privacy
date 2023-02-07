@@ -1,6 +1,20 @@
 import pandas as pd
 from utils import get_engine
-from fill_matrix import clean_impossible_matches
+
+
+def clean_impossible_matches(df):
+    """Delete impossible tasks from data (user not in pool)."""
+    df_ix = df.index
+    df_ = df.set_index(["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])
+    df_["df_ix"] = df_ix
+
+    sum_same_user_by_task = df.groupby(by=["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])[
+        "same_user"
+    ].sum()
+    impossible_task_ix = sum_same_user_by_task[sum_same_user_by_task < 1].index
+
+    df_ix_to_delete = df_.loc[impossible_task_ix, "df_ix"]
+    return df.drop(df_ix_to_delete)
 
 
 def rank_users(engine, study="gc1", table_name="distance_1w"):

@@ -133,33 +133,6 @@ def relate_to_features():
     analyze_features(all_features_studies)
 
 
-def rank_users():
-    engine = get_engine(DBLOGIN_FILE="dblogin.json")
-    for study in ["gc1", "gc2"]:
-        distances_query = f"SELECT * FROM {study}.distance"  # WHERE p_duration=28 and u_duration=28"
-        feature_cross_product_df = pd.read_sql(distances_query, con=engine)
-        feature_cross_product_df["same_user"] = (
-            feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
-        )
-        metric = "mse"
-        feature_cross_product_df[f"{metric}_combined"] = (
-            feature_cross_product_df[f"{metric}_in_degree"]
-            + feature_cross_product_df[f"{metric}_out_degree"]
-            + feature_cross_product_df[f"{metric}_shortest_path"]
-            + feature_cross_product_df[f"{metric}_transition"]
-        )
-        feature_cross_product_df = clean_impossible_matches(feature_cross_product_df)
-        feature_cross_product_df["rank"] = feature_cross_product_df.groupby(
-            by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"]
-        )["mse_combined"].rank()
-        df_rank_filtered = feature_cross_product_df[feature_cross_product_df["same_user"]]
-        df_rank_filtered = df_rank_filtered[
-            ["p_user_id", "p_duration", "p_filename", "u_user_id", "u_duration", "u_filename", "rank"]
-        ]
-        df_rank_filtered.to_sql("user_ranking", engine, study, if_exists="replace")
-        print("Ranks written to DB")
-
-
 def analyze_features(res):
     # # Load from csv
     # res = []

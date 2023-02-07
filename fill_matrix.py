@@ -4,17 +4,12 @@ import os
 from visualization import plot_intra_inter
 
 
-def calculate_reciprocal_rank(df, k=10, return_reciprocal=False, distance_column="distance", intra_inter_study=None):
+def calculate_reciprocal_rank(
+    df_rank_filtered, k=10, return_reciprocal=False, distance_column="distance", intra_inter_study=None
+):
     """ 
     Calculate reciprocal rank 
     """
-    # compute rank for each user
-    df["rank"] = df.groupby(by=["u_user_id", "u_duration", "u_filename", "p_duration", "p_filename"])[
-        distance_column
-    ].rank()
-    # for comparison to other paper:
-    # df[["p_user_id", "u_user_id", "rank"]].to_csv("test_data_privacy_loss_gc2.csv")
-    df_rank_filtered = df[df["same_user"]]
 
     # plot intra-inter user differences
     if intra_inter_study is not None:
@@ -81,72 +76,14 @@ def calculate_topk_accuracy(df, k, distance_column="distance"):
     return mean_matrix, std_matrix
 
 
-def clean_impossible_matches(df):
-    """Delete impossible tasks from data (user not in pool)."""
-    df_ix = df.index
-    df_ = df.set_index(["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])
-    df_["df_ix"] = df_ix
-
-    sum_same_user_by_task = df.groupby(by=["p_duration", "u_duration", "p_filename", "u_filename", "u_user_id"])[
-        "same_user"
-    ].sum()
-    impossible_task_ix = sum_same_user_by_task[sum_same_user_by_task < 1].index
-
-    df_ix_to_delete = df_.loc[impossible_task_ix, "df_ix"]
-    return df.drop(df_ix_to_delete)
-
-
 if __name__ == "__main__":
 
     STUDY = "gc1"
+    engine = get_engine(DBLOGIN_FILE="dblogin.json")
 
     # make output dir
     output_base_path = os.path.join("outputs", STUDY)
     os.makedirs(output_base_path, exist_ok=True)
-
-    # load similarity data
-    engine = get_engine(DBLOGIN_FILE=os.path.join("dblogin.json"))
-    print("download distances")
-    distances_query = f"SELECT * FROM {STUDY}.distance"  # WHERE p_duration>16 and u_duration<16"  # for testing:
-    feature_cross_product_df = pd.read_sql(distances_query, con=engine)
-
-    # calculate same_user_flag (important for topk acc)
-    feature_cross_product_df["same_user"] = (
-        feature_cross_product_df["p_user_id"] == feature_cross_product_df["u_user_id"]
-    )
-    # Impossible matches: happen when one user_id appears only in one time period but not in the other --> cannot be
-    # reidentified
-    feature_cross_product_df = clean_impossible_matches(feature_cross_product_df)
-
-    # Compute combined distances
-    for metric in ["kldiv", "mse", "wasserstein"]:
-        feature_cross_product_df[f"{metric}_combined"] = (
-            feature_cross_product_df[f"{metric}_in_degree"]
-            + feature_cross_product_df[f"{metric}_out_degree"]
-            + feature_cross_product_df[f"{metric}_shortest_path"]
-            + feature_cross_product_df[f"{metric}_transition"]
-        )
-    # Sum up all similarities
-    feature_cross_product_df["all_combined"] = (
-        feature_cross_product_df["kldiv_combined"]
-        + feature_cross_product_df["mse_combined"]
-        + feature_cross_product_df["wasserstein_combined"]
-    )
-
-    # EXAMPLE: Print out results for one case for debugging
-    DIST_COL = "mse_combined"
-    mean_matrix, std_matrix = calculate_topk_accuracy(
-        feature_cross_product_df, k=10, distance_column=DIST_COL
-    )  # uses the column distance
-    print("Output original k accuracy function:")
-    print(mean_matrix)
-    print(std_matrix)
-    mean_matrix, std_matrix = calculate_reciprocal_rank(
-        feature_cross_product_df, k=10, distance_column=DIST_COL, intra_inter_study=STUDY
-    )
-    print("Output new function(based on rank):")
-    print(mean_matrix)
-    print(std_matrix)
 
     # RUN for all:
     # collect all possibilities
@@ -162,15 +99,14 @@ if __name__ == "__main__":
         os.makedirs(out_path, exist_ok=True)
         # Run on all dist types
         for dist_col in possible_cols:
+            df_rank = pd.read_sql(f"SELECT * FROM {STUDY}.user_ranking_{dist_col}", engine)
             if k == 0:  # encoding for reciprocal rank:
                 mean_matrix, std_matrix = calculate_reciprocal_rank(
-                    feature_cross_product_df, return_reciprocal=True, distance_column=dist_col
+                    df_rank, return_reciprocal=True, distance_column=dist_col
                 )
             else:
                 # accuracy can also be calculated via reciprocal rank function
-                mean_matrix, std_matrix = calculate_reciprocal_rank(
-                    feature_cross_product_df, k=k, distance_column=dist_col
-                )
+                mean_matrix, std_matrix = calculate_reciprocal_rank(df_rank, k=k, distance_column=dist_col)
             # save mean and std as output
             mean_matrix.to_csv(os.path.join(out_path, "mean_" + dist_col + ".csv"))
             std_matrix.to_csv(os.path.join(out_path, "std_" + dist_col + ".csv"))

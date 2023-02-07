@@ -34,11 +34,15 @@ with the highest out-degree is computed.
     - Loads the cross-joined pairs
     - Computes similarity with several metrics for each pair
     - Writes the result to the database
-4) [**fill_matrix**](fill_matrix.py):
+4) [**rank users**](rank_users.py)
+    - Loads the similarities
+    - For each duration-bin combination, rank the users from the pool by their distance to the current user
+    - Write the rank of the matched user to the database
+5) [**fill_matrix**](fill_matrix.py):
     - Loads similarities for all combinations (all users & time period bins)
     - Computes reidentification accuracy for all time-bin combinations (over users)
     - Computes reciprocal ranks
-5) [**visualization**](visualization.py): Functions for visualizing / summarizing all results reported in the paper, namely
+6) [**visualization**](visualization.py): Functions for visualizing / summarizing all results reported in the paper, namely
     - The reidentification accuracies (Figure 2)
         - How much is the reidentification top-k accuracy for differnt tracking periods
     - Regression analysis (Table 1)
