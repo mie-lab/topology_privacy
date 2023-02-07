@@ -118,15 +118,15 @@ def plot_intra_inter(rank_df, save_path="1journal_paper"):
     inter_user = std_rank_per_bin.reset_index().groupby("p_duration").agg({"rank_std": ["mean", "std"]})
 
     # Barplot
-    width = 0.75
+    width = 1
     offset = width / 2
-    plt.bar(inter_user.index - offset, inter_user[("rank_std", "mean")], width=width, label="Inter user")
-    plt.bar(intra_user.index + offset, intra_user[("rank_std", "mean")], width=width, label="Intra user")
-    plt.xticks(inter_user.index, inter_user.index)
-    plt.xlabel("Tracking period of pool", fontsize=14)
-    plt.ylabel("Standard deviation of rank", fontsize=14)
-    plt.ylim(0, 45)
-    plt.legend(loc="upper right", fontsize=14)
+    plt.bar(inter_user.index - offset, inter_user[("rank_std", "mean")], width=width, label="Inter-user variance")
+    plt.bar(intra_user.index + offset, intra_user[("rank_std", "mean")], width=width, label="Intra-user variance")
+    plt.xticks(inter_user.index, inter_user.index, fontsize=15)
+    plt.xlabel("Tracking period of pool", fontsize=15)
+    plt.ylabel("Standard deviation of rank", fontsize=15)
+    # plt.ylim(0, 45)
+    plt.legend(fontsize=15)
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(save_path)
@@ -171,7 +171,11 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
     plt.rcParams.update({"font.size": 15})
 
     plt.figure(figsize=(5, 5))
-    plt.boxplot([out_gc1["rank"], out_gc2["rank"]])
+    widths = [0.25, 0.25]
+    plt.boxplot([out_gc1["rank"], out_gc2["rank"]], widths=widths)
+    plt.plot([1 - widths[0], 1 + widths[0]], [139 / 2, 139 / 2], c="green", label="random reference", linestyle="--")
+    plt.plot([2 - widths[0], 2 + widths[0]], [49 / 2, 49 / 2], c="green", linestyle="--")
+    plt.legend()
     plt.xticks([1, 2], ["Green Class 1", "Green Class 2"])
     plt.ylabel("Rank")
     plt.tight_layout()
@@ -182,7 +186,7 @@ def privacy_loss_plot(gc1_ranks, gc2_ranks, save_path="1journal_paper"):
     plt.boxplot([out_gc1["privacy_loss"], out_gc2["privacy_loss"]])
     plt.xticks([1, 2], ["Green Class 1", "Green Class 2"])
     plt.ylabel("Privacy loss")
-    plt.ylim(-1, 5)
+    # plt.ylim(-1, 10)
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, "privacy_loss.pdf"))
     # plt.show()
@@ -239,19 +243,31 @@ def inbetween_analysis(df_rank, out_path="1journal_paper"):
     df_rank["Weeks between pool-bin and user-bin"] = (
         (df_rank["u_filename"] - df_rank["p_filename"]).dt.total_seconds() / (3600 * 24 * 7)
     ).astype(int)
-    df_rank["Reciprocal rank"] = 1 / df_rank["rank"]
 
+    top10acc = lambda x: sum(x <= 10) / len(x)
+    top10_acc_plot = df_rank.groupby(["Weeks between pool-bin and user-bin"]).agg({"rank": top10acc}).reset_index()
     sns.set(font_scale=1.4)
     sns.set_style("whitegrid")
     plt.figure(figsize=(9, 4.5))
     sns.barplot(
-        data=df_rank,
+        data=top10_acc_plot,
         x="Weeks between pool-bin and user-bin",
-        y="Reciprocal rank",
+        y="rank",
         hatch="/",
         edgecolor="black",
         color="lightgrey",
     )
+    plt.ylabel("Top-10-Accuracy")
+    # # reciprocal rank instead
+    # df_rank["Reciprocal rank"] = 1 / df_rank["rank"]
+    # sns.barplot(
+    #     data=df_rank,
+    #     x="Weeks between pool-bin and user-bin",
+    #     y="Reciprocal rank",
+    #     hatch="/",
+    #     edgecolor="black",
+    #     color="lightgrey",
+    # )
     plt.tight_layout()
     if out_path is not None:
         plt.savefig(os.path.join(out_path, "inbetween_experiment.pdf"))
