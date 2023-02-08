@@ -5,6 +5,8 @@ import sqlalchemy
 import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu, pearsonr
 
+import statsmodels.api as sm
+
 from graph_trackintel.graph_utils import get_largest_component
 from graph_trackintel.io import read_graphs_from_postgresql
 from graph_trackintel.analysis.graph_features import (
@@ -16,7 +18,6 @@ from graph_trackintel.analysis.graph_features import (
     highest_decile_distance,
 )
 from utils import get_engine
-from fill_matrix import clean_impossible_matches
 
 
 def get_q_for_col(col, questions):
@@ -84,18 +85,18 @@ def compute_graph_features():
 
             # write to db
             df_feats = pd.DataFrame(table_precomputed_feats)
-            df_feats.to_sql("graph_features", engine, study, if_exists="replace")
+            df_feats.to_sql("graph_features", engine, study, if_exists="append")
             print("written to db")
 
 
-def relate_to_features():
+def load_features_for_correlation():
     all_features_studies = []
     # con = get_engine(return_con=True, DBLOGIN_FILE="dblogin.json")
     engine = get_engine(DBLOGIN_FILE="dblogin.json")
     for study in ["gc1", "gc2"]:
 
-        # get graph features
-        graph_feats = pd.read_sql(f"SELECT * FROM {study}.graph_features", engine)
+        # get graph features TODO: for now only using 28-bin features
+        graph_feats = pd.read_sql(f"SELECT * FROM {study}.graph_features WHERE duration=28", engine)
         print("loaded graph feats", graph_feats["user_id"].nunique(), len(graph_feats))
 
         # get classical features
@@ -110,18 +111,22 @@ def relate_to_features():
         print("Loaded user info", len(user_info))
 
         # get user matching difficulty (i.e., the rank)
-        rank_query = (
-            f"SELECT u_user_id, u_filename, rank FROM {study}.user_ranking WHERE p_duration=28 AND u_duration=28"
-        )
+        rank_query = f"SELECT u_user_id, u_filename, rank FROM {study}.user_ranking_mse_combined WHERE p_duration=4 AND u_duration=4"
         ranks = pd.read_sql(rank_query, con=engine).rename(columns={"u_user_id": "user_id"})
         print("Loaded ranks", ranks["user_id"].nunique(), len(ranks))
 
-        # merge rank with user info and graph feats
-        together = ranks.merge(user_info, how="left", left_on="user_id", right_on="user_id")
-        together = together.merge(classical_feats, how="left", left_on="user_id", right_on="user_id")
-        together = together.merge(
-            graph_feats, how="left", left_on=["user_id", "u_filename"], right_on=["user_id", "file_name"]
+        # merge with graph feats on correct bin
+        together = ranks.merge(  # TODO: on "u_duration", "u_filename" and "duration", "file_name"
+            graph_feats, how="left", left_on=["user_id"], right_on=["user_id"]
         )
+        # group by user
+        agg_dict = {col: "mean" for col in graph_feats.columns if col not in ["user_id", "file_name", "duration"]}
+        agg_dict["rank"] = "mean"
+        together = together.groupby("user_id").agg(agg_dict).reset_index()
+
+        # merge rank with user info and graph feats
+        together = together.merge(user_info, how="left", left_on="user_id", right_on="user_id")
+        together = together.merge(classical_feats, how="left", left_on="user_id", right_on="user_id")
         print("final", together.columns, len(together))
 
         # correlate rank with user survey features and graph feats
@@ -130,10 +135,10 @@ def relate_to_features():
     all_features_studies = pd.concat(all_features_studies)
 
     # Pass the combined df to the analyze function
-    analyze_features(all_features_studies)
+    analyze_features_correlation(all_features_studies)
 
 
-def analyze_features(res):
+def analyze_features_correlation(res):
     # # Load from csv
     # res = []
     # for study in ["gc1", "gc2"]:
@@ -184,6 +189,86 @@ def analyze_features(res):
     pd.DataFrame(test_results).sort_values("p-value").to_csv(os.path.join("outputs", "test_results_features.csv"))
 
 
+def analyze_features_regression(out_path):
+    # selet suitable subset of features because otherwise it requires a lot of explanation
+    use_features = (
+        ["radius_of_gyration", "random_entropy", "real_entropy", "median_trip_distance"]
+        + ["journey_length", "hub_size", "degree_beta", "transition_beta"]  # common normal features
+        + ["age", "sex", "HT", "GA"]  # graph features  # socio-demographics
+    )
+    out_by_dur = []
+    for duration in [1, 2] + [4 * (i + 1) for i in range(7)]:
+        all_features_studies = []
+        # con = get_engine(return_con=True, DBLOGIN_FILE="dblogin.json")
+        engine = get_engine(DBLOGIN_FILE="dblogin.json")
+        # over studies
+        both_studies = []
+        for study in ["gc1", "gc2"]:
+
+            # get graph features TODO: for now only using 28-bin features
+            graph_feats = pd.read_sql(f"SELECT * FROM {study}.graph_features WHERE duration=28", engine)
+            print("loaded graph feats", graph_feats["user_id"].nunique(), len(graph_feats))
+            # group by user and average the graph features
+            agg_dict = {col: "mean" for col in graph_feats.columns if col not in ["user_id", "file_name", "duration"]}
+            graph_feats = graph_feats.groupby("user_id").agg(agg_dict).reset_index()
+
+            # get classical features
+            classical_feats = pd.read_sql(f"SELECT * FROM {study}.classical_features", engine)
+            print("loaded classical feats", classical_feats["user_id"].nunique(), len(classical_feats))
+            classical_feats["user_id"] = classical_feats["user_id"].astype(str)
+
+            # get user info
+            user_info = pd.read_sql_query(sql=f"SELECT * FROM {study}.user_info_clean".format(study), con=engine)
+            user_info = user_info[~pd.isna(user_info["user_id"])]
+            user_info["user_id"] = user_info["user_id"].astype(str)
+            print("Loaded user info", len(user_info))
+
+            # get user matching difficulty (i.e., the rank)
+            rank_query = f"SELECT u_user_id, u_filename, rank FROM {study}.user_ranking_mse_combined WHERE p_duration={duration} AND u_duration={duration}"
+            ranks = pd.read_sql(rank_query, con=engine).rename(columns={"u_user_id": "user_id"})
+            print("Loaded ranks", ranks["user_id"].nunique(), len(ranks))
+
+            # merge with graph feats on correct bin
+            together = ranks.merge(  # TODO: on "u_duration", "u_filename" and "duration", "file_name"
+                graph_feats, how="left", left_on=["user_id"], right_on=["user_id"]
+            )
+            # merge rank with user info and graph feats
+            together = together.merge(user_info, how="left", left_on="user_id", right_on="user_id")
+            together = together.merge(classical_feats, how="left", left_on="user_id", right_on="user_id")
+            #             print("final", together.columns, len(together))
+
+            # restrict to the feature set and append
+            both_studies.append(together[use_features + ["rank"]].reset_index())
+        both_studies = pd.concat(both_studies)
+
+        # preprocess
+        both_studies["sex"] = both_studies["sex"].map({"Male": 0, "Female": 1})
+        both_studies["id"] = np.arange(len(both_studies))
+        both_studies.set_index("id", inplace=True)
+        #         print(both_studies)
+        print("Before", len(both_studies), "after dropping nans", len(both_studies[use_features].dropna()))
+        # convert to X, y
+        notna_index = both_studies[use_features].dropna().index
+        X = both_studies.loc[notna_index, use_features]
+        y = both_studies.loc[notna_index, "rank"]
+
+        X_normed = (X - X.mean()) / (X.std() + 1e-7)
+        X_normed.shape
+        X2 = sm.add_constant(X_normed)
+        est = sm.OLS(y, X2)
+        est2 = est.fit()
+        # postprocessing
+        out = est2.summary2().tables[1][["Coef.", "P>|t|"]].round(3).swapaxes(1, 0)
+        out.index.name = "M"
+        out.reset_index(inplace=True)
+        out["R squared"] = est2.rsquared
+        out["duration"] = duration
+        out_by_dur.append(out)
+    out_by_dur = pd.concat(out_by_dur)
+    with open(out_path, "w") as outfile:
+        print(out_by_dur.set_index(["duration", "M"]).round(2).to_latex(float_format="%.2f"), file=f)
+
+
 if __name__ == "__main__":
     # # compute graph features for each user and write to a new table
     # compute_graph_features()
@@ -192,4 +277,4 @@ if __name__ == "__main__":
     # rank_users()
 
     # # merge with user survey features
-    relate_to_features()
+    analyze_features_regression(out_path="outputs/feature_regression.txt")
