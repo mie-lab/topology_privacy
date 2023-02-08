@@ -227,6 +227,9 @@ def analyze_features_regression(out_path):
             rank_query = f"SELECT u_user_id, u_filename, rank FROM {study}.user_ranking_mse_combined WHERE p_duration={duration} AND u_duration={duration}"
             ranks = pd.read_sql(rank_query, con=engine).rename(columns={"u_user_id": "user_id"})
             print("Loaded ranks", ranks["user_id"].nunique(), len(ranks))
+            nr_unique_users = ranks["user_id"].nunique()
+            ranks["rank"] = ranks["rank"] / nr_unique_users * 100
+            ranks = ranks.groupby("user_id").agg({"rank": "mean"})
 
             # merge with graph feats on correct bin
             together = ranks.merge(  # TODO: on "u_duration", "u_filename" and "duration", "file_name"
@@ -265,8 +268,20 @@ def analyze_features_regression(out_path):
         out["duration"] = duration
         out_by_dur.append(out)
     out_by_dur = pd.concat(out_by_dur)
+
+    coef_rounded = out_by_dur[out_by_dur["M"] == "Coef."].set_index(["duration", "M"]).round(2)
+    coef_as_str = coef_rounded.values.astype(str)
+    p_vals_significant = out_by_dur[out_by_dur["M"] != "Coef."].set_index(["duration", "M"]) < 0.05  # .values
+    coef_as_str[p_vals_significant] = np.char.add(coef_as_str[p_vals_significant], " (*)")
+    final_df_only_coef = (
+        pd.DataFrame(coef_as_str, columns=coef_rounded.columns, index=coef_rounded.index)
+        .reset_index()
+        .drop("M", axis=1)
+        .set_index("duration")
+    )
+
     with open(out_path, "w") as outfile:
-        print(out_by_dur.set_index(["duration", "M"]).round(2).to_latex(float_format="%.2f"), file=f)
+        print(final_df_only_coef.to_latex(), file=outfile)
 
 
 if __name__ == "__main__":
