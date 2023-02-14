@@ -197,22 +197,22 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1jo
     Analyze the influence of pool and test tracking duration on the matching accuracy
     Loads the MSE matrix, applies regression analysis and prints the result as a latex table.
     """
+    week_bins = [1, 2] + [(i + 1) * 4 for i in range(7)]
     out_df = {}
     for k in [0, 1, 5, 10]:
         # load matrix
         res = pd.read_csv(os.path.join(in_path, f"acc_k{k}", "mean_mse_combined.csv"), index_col="p_duration")
         res_arr = np.array(res)
-        months_p, months_u = np.where(res_arr)
-        # duration difference
-        diff = np.abs(months_p - months_u)
         # Run linear regression
-        X = (np.array(list(zip(months_p + 1, months_u + 1, diff)))) * 4
+        X = np.array([[(w, v) for w in week_bins] for v in week_bins]).reshape(-1, 2)
+        diff = np.abs(X[:, 0] - X[:, 1])
+        X = np.hstack((X, np.expand_dims(diff, 1)))
         Y = res_arr.flatten()
         X = X[~np.isnan(Y)]
         Y = Y[~np.isnan(Y)]
         reg = LinearRegression().fit(X, Y)
         # save coefficients
-        out_df[k] = reg.coef_.tolist() + [reg.intercept_]
+        out_df[k] = reg.coef_.tolist() + [reg.intercept_] + [reg.score(X, Y)]
 
     # rename for clean table
     out_df = (
@@ -220,10 +220,11 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1jo
         .rename(
             columns={0: "MRR", 1: "1-Accuracy", 5: "5-Accuracy", 10: "10-Accuracy"},
             index={
-                0: "Coefficient pool duration",
-                1: "Coefficient test duration",
-                2: "Coefficient of absolute difference between pool and test duration",
+                0: "test duration",
+                1: "pool duration",
+                2: "Absolute difference between pool and test duration",
                 3: "Intercept",
+                4: "R2 score",
             },
         )
         .swapaxes(1, 0)
