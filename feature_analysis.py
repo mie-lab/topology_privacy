@@ -246,14 +246,23 @@ def analyze_features_regression(out_path):
 
         # preprocess
         both_studies["sex"] = both_studies["sex"].map({"Male": 0, "Female": 1})
+        both_studies["PT"] = 0
+        both_studies.loc[both_studies["HT"] == 1, "PT"] = 0.5
+        both_studies.loc[both_studies["GA"] == 1, "PT"] = 1
+        both_studies.drop(["GA", "HT", "index"], axis=1, inplace=True)
         both_studies["id"] = np.arange(len(both_studies))
         both_studies.set_index("id", inplace=True)
         #         print(both_studies)
-        print("Before", len(both_studies), "after dropping nans", len(both_studies[use_features].dropna()))
+        print("Before", len(both_studies), "after dropping nans", len(both_studies.dropna()))
         # convert to X, y
-        notna_index = both_studies[use_features].dropna().index
-        X = both_studies.loc[notna_index, use_features]
+        notna_index = both_studies.dropna().index
+        X = both_studies.drop("rank", axis=1).loc[notna_index]
         y = both_studies.loc[notna_index, "rank"]
+
+        # check for collinearity
+        corr = both_studies.dropna().corr()
+        print("Highest absolute correlation value:", np.sort(np.abs(np.array(corr).flatten()))[-len(corr) - 1])
+        # both_studies.to_csv(f"test_collinearity_{duration}.csv")
 
         X_normed = (X - X.mean()) / (X.std() + 1e-7)
         X_normed.shape
@@ -279,7 +288,7 @@ def analyze_features_regression(out_path):
         .drop("M", axis=1)
         .set_index("duration")
     )
-
+    final_df_only_coef.to_csv(out_path[:-3] + "csv")
     with open(out_path, "w") as outfile:
         print(final_df_only_coef.to_latex(), file=outfile)
 

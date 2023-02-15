@@ -8,6 +8,11 @@ dblogin.json
 
 # vscode
 *code-workspace
+1paper/
+1journal_paper/
+outputs*
+*.ipynb
+.DS_Store
 
 # C extensions
 *.so

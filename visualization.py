@@ -6,6 +6,7 @@ from matplotlib.lines import Line2D
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from utils import get_engine
+import statsmodels.api as sm
 
 
 def plot_matrix(mean, std=None, save_path=None, include_1week=True):
@@ -46,7 +47,7 @@ def plot_matrix(mean, std=None, save_path=None, include_1week=True):
     else:
         plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
         plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
-    plt.xlabel("Duration user", fontsize=25)
+    plt.xlabel("Duration test user", fontsize=25)
     plt.ylabel("Duration pool", fontsize=25)
     plt.tight_layout()
     if save_path is not None:
@@ -213,6 +214,13 @@ def regression_analysis(in_path="../topology_privacy/outputs/gc1", out_path="1jo
         reg = LinearRegression().fit(X, Y)
         # save coefficients
         out_df[k] = reg.coef_.tolist() + [reg.intercept_] + [reg.score(X, Y)]
+
+        X2 = sm.add_constant(X)
+        est = sm.OLS(Y, X2)
+        est2 = est.fit()
+        p_values = est2.pvalues.tolist()
+        # p_value_dict[k] = p_values
+        print("All p values significant?", np.array(p_values) < 0.05)
 
     # rename for clean table
     out_df = (
