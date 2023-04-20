@@ -29,29 +29,38 @@ def plot_matrix(mean, std=None, save_path=None, include_1week=True):
         label = []
         for data, text in zip(data.flatten(), text.flatten()):
             if pd.isna(text):
-                label.append("{0:.2f}".format(data))
+                if "k0" not in save_path:
+                    label.append("{0:.1f}".format(data))
+                else:
+                    label.append("{0:.2f}".format(data))
             else:
-                label.append("{0:.2f}\n".format(data) + "\u00B1" + "{0:.2f}".format(text))
+                if "k0" not in save_path:
+                    label.append("{0:.1f}\n".format(data) + "\u00B1" + "{0:.1f}".format(text))
+                else:
+                    label.append("{0:.2f}\n".format(data) + "\u00B1" + "{0:.2f}".format(text))
         return np.asarray(label).reshape(mean.shape)
 
-    sns.set(font_scale=1.5)
+    if "k0" not in save_path:
+        sns.set(font_scale=1.8)
+    else:
+        sns.set(font_scale=1.65)
     # construct labels
     labels = data_to_label(np.array(mean), np.array(std))
     print(labels.shape, mean.shape)
     # make heatmap with labels in the cells
     plt.figure(figsize=(10, 8))
-    sns.heatmap(mean, annot=labels, fmt="", cmap="YlGnBu")
+    sns.heatmap(mean, annot=labels, fmt="", cmap="YlGnBu", linewidths=2)
     if include_1week:
-        plt.xticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=20)
-        plt.yticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=20)
+        plt.xticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=26)
+        plt.yticks(np.arange(9) + 0.5, [1, 2] + np.arange(4, 32, 4).tolist(), fontsize=26)
     else:
-        plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
-        plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=20)
-    plt.xlabel("Duration test user", fontsize=25)
-    plt.ylabel("Duration pool", fontsize=25)
+        plt.xticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=26)
+        plt.yticks(np.arange(7) + 0.5, np.arange(4, 32, 4), fontsize=26)
+    plt.xlabel("Duration test user", fontsize=29)
+    plt.ylabel("Duration pool", fontsize=29)
     plt.tight_layout()
     if save_path is not None:
-        plt.savefig(save_path)
+        plt.savefig(save_path, bbox_inches='tight')
     else:
         plt.show()
 
@@ -123,11 +132,12 @@ def plot_intra_inter(rank_df, save_path="1journal_paper"):
     offset = width / 2
     plt.bar(inter_user.index - offset, inter_user[("rank_std", "mean")], width=width, label="Inter-user variance")
     plt.bar(intra_user.index + offset, intra_user[("rank_std", "mean")], width=width, label="Intra-user variance")
-    plt.xticks(inter_user.index, inter_user.index, fontsize=15)
-    plt.xlabel("Tracking period of pool", fontsize=15)
-    plt.ylabel("Standard deviation of rank", fontsize=15)
+    plt.xticks(inter_user.index, inter_user.index, fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.xlabel("Tracking period of pool", fontsize=18)
+    plt.ylabel("Standard deviation of rank", fontsize=18)
     # plt.ylim(0, 45)
-    plt.legend(fontsize=15)
+    plt.legend(fontsize=18, loc="lower right", framealpha=1)
     plt.tight_layout()
     if save_path is not None:
         plt.savefig(save_path)
